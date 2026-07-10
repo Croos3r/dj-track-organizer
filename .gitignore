@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+rename_plan.csv
+rename_rollback.csv
