@@ -79,17 +79,27 @@ def open_database():
                  "once, and that it is fully CLOSED right now.")
 
 
-def locate_db_file(db):
-    for attr in ("db_path", "path", "filename", "_path"):
+def locate_db_file(db, override=None):
+    """Find the master.db path from the override, the db object, or the config."""
+    if override:
+        return override if os.path.isfile(override) else None
+    # 1. attributes on the database object
+    for attr in ("db_path", "path", "filename", "_db_path", "_path"):
         p = getattr(db, attr, None)
-        if p and os.path.isfile(str(p)):
-            return str(p)
-    # fall back to pyrekordbox config
+        if p:
+            p = str(p)
+            if os.path.isfile(p):
+                return p
+    # 2. pyrekordbox config, each Rekordbox version tried independently
     try:
         from pyrekordbox.config import get_config
-        p = get_config("rekordbox6", "db_path") or get_config("rekordbox7", "db_path")
-        if p and os.path.isfile(str(p)):
-            return str(p)
+        for section in ("rekordbox7", "rekordbox6", "rekordbox5"):
+            try:
+                p = get_config(section, "db_path")
+            except Exception:  # noqa: BLE001 - empty section raises KeyError
+                continue
+            if p and os.path.isfile(str(p)):
+                return str(p)
     except Exception:  # noqa: BLE001
         pass
     return None
@@ -100,8 +110,7 @@ def backup_db(db_file, backup_dir):
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     dest = os.path.join(backup_dir, f"master.db.{stamp}.bak")
     shutil.copy2(db_file, dest)
-    # also copy the -wal / -shm side files if present
-    for ext in ("-wal", "-shm"):
+    for ext in ("-wal", "-shm"):  # copy side files if present
         side = db_file + ext
         if os.path.exists(side):
             shutil.copy2(side, dest + ext)
@@ -118,6 +127,9 @@ def main():
     ap.add_argument("--folder", default=None,
                     help="Only touch tracks whose folder path contains this "
                          "string (recommended, limits scope to your library)")
+    ap.add_argument("--db", default=None,
+                    help="Explicit path to master.db (only needed if auto-detect "
+                         "fails)")
     ap.add_argument("--set-title", action="store_true",
                     help="Also set the Title in the database from the new "
                          "filename (artist is left for Rekordbox 'Reload Tag')")
@@ -134,13 +146,15 @@ def main():
     print(f"loaded {len(mapping)} renamed entries from {args.map}")
 
     db = open_database()
-    from_content = db.get_content()
+    db_file = locate_db_file(db, args.db)
+    print(f"master.db: {db_file or 'NOT FOUND (use --db to set it explicitly)'}")
+
+    all_content = db.get_content()
     if args.folder:
-        # filter in Python to keep it simple/portable across schema versions
-        contents = [c for c in from_content
+        contents = [c for c in all_content
                     if args.folder in (getattr(c, "FolderPath", "") or "")]
     else:
-        contents = list(from_content)
+        contents = list(all_content)
 
     plan = []
     for c in contents:
@@ -149,11 +163,11 @@ def main():
         if cur_name in mapping and mapping[cur_name] != cur_name:
             new_name = mapping[cur_name]
             new_path = os.path.join(os.path.dirname(folder_path), new_name)
-            artist, title = parse_name(new_name)
-            plan.append((c, cur_name, new_name, folder_path, new_path, title))
+            _, title = parse_name(new_name)
+            plan.append((c, cur_name, new_name, new_path, title))
 
     print(f"tracks to relink: {len(plan)}")
-    for _, old, new, _, _, _ in plan[:15]:
+    for _, old, new, _, _ in plan[:15]:
         print(f"  {old}  ->  {new}")
     if len(plan) > 15:
         print(f"  ... and {len(plan) - 15} more")
@@ -166,14 +180,16 @@ def main():
         print("Nothing to do.")
         return
 
+    if not db_file:
+        sys.exit("Could not locate master.db to back it up. Pass it explicitly "
+                 "with --db \"C:\\Users\\<you>\\AppData\\Roaming\\Pioneer\\"
+                 "rekordbox\\master.db\". Aborting for safety.")
+
     if not args.yes:
         ans = input("\nIs Rekordbox FULLY CLOSED? Type 'yes' to continue: ").strip().lower()
         if ans != "yes":
             sys.exit("Aborted. Close Rekordbox and run again.")
 
-    db_file = locate_db_file(db)
-    if not db_file:
-        sys.exit("Could not locate master.db to back it up. Aborting for safety.")
     backup_dir = args.backup_dir or os.path.join(os.getcwd(), "rekordbox_backups")
     try:
         dest = backup_db(db_file, backup_dir)
@@ -182,7 +198,7 @@ def main():
     print(f"backed up master.db -> {dest}")
 
     changed = 0
-    for c, _, new_name, _, new_path, title in plan:
+    for c, _, new_name, new_path, title in plan:
         c.FolderPath = new_path
         if hasattr(c, "FileNameL"):
             c.FileNameL = new_name
