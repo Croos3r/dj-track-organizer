@@ -87,7 +87,9 @@ def is_slug(b):
 def parse_from_filename(fn):
     """Best-effort (artist, title, confident) from a filename without good tags."""
     base = strip_junk(re.sub(r"\.[^.]+$", "", fn))
-    base = re.sub(r"^\d{1,2}[\s_.\-]+", "", base)  # leading track number
+    # leading track number: only clearly numbered forms ("01 ", "1. ", "1 - "),
+    # so numeric artist names like "12 Inch" or "4.20" survive
+    base = re.sub(r"^(?:0\d[\s_.\-]+|\d{1,2}(?:\.\s+|\s*-\s+|_+))", "", base)
     base = re.sub(r"(-(?:original|extended|radio)-mix)\1", r"\1", base, flags=re.I)
     if is_slug(base):
         return None, titlecase_slug(base), False
