@@ -6,9 +6,11 @@ description: >-
   song). Use whenever someone wants to deduplicate, find duplicates, remove
   repeated tracks, or clean up a bloated music/DJ library. Detects exact
   byte-identical files and same-song duplicates by Artist + Title, keeps the
-  best-quality copy, and moves the extras aside safely. Trigger on "find
-  duplicate songs", "I have the same track twice", "clean up duplicates", or
-  "remove duplicate music files".
+  best-quality copy, and moves the extras aside safely. Can also deduplicate
+  entries inside the Rekordbox collection (--rekordbox-db) when several rows
+  point at the same file. Trigger on "find duplicate songs", "I have the same
+  track twice", "clean up duplicates", "remove duplicate music files", or
+  "duplicate entries in Rekordbox".
 ---
 
 # Dedup Tracks
@@ -46,6 +48,28 @@ For each duplicate set it picks a keeper, preferring lossless formats
    python3 scripts/dedup_tracks.py "/path/to/music" --move "/path/to/music/_duplicates"
    ```
 
+## Rekordbox collection mode (`--rekordbox-db`)
+
+Deduplicates entries *inside* the Rekordbox database instead of files on disk —
+for when the app shows the same track several times because multiple rows point
+at the same file (path case or slash-direction variants) or at different files
+of the same song (e.g. a dead `.mp3` entry next to its `.wav` replacement).
+
+```bash
+# dry run: report what would be removed (positional arg filters stored paths)
+python3 scripts/dedup_tracks.py Track --rekordbox-db
+
+# apply: backs up master.db first, requires Rekordbox to be CLOSED
+python3 scripts/dedup_tracks.py Track --rekordbox-db --apply
+```
+
+The keeper is chosen by best quality (lossless extension first); on a tie, the
+entry with the most info (cues x3, playlist memberships x2, play count, rating,
+comment), then the oldest. Playlist memberships of removed entries move to the
+keeper (deduplicated per playlist), and the removed entry's cues are transferred
+when the keeper has none. Requires `pip install pyrekordbox`. Dry run by
+default; `--apply` always backs up `master.db` first and aborts if it cannot.
+
 ## Options reference
 
 ```
@@ -56,6 +80,12 @@ python3 scripts/dedup_tracks.py FOLDER [options]
   --report PATH      where to write the report CSV
   --move DEST        move extra copies into DEST (reversible, recommended)
   --delete           delete extra copies (dangerous)
+
+  --rekordbox-db     deduplicate Rekordbox collection entries instead of files
+  --db PATH          explicit master.db path (if auto-detect fails)
+  --apply            write the removals to the database (default: dry run)
+  --backup-dir DIR   where to store the master.db backup
+  --yes              skip the 'Rekordbox is closed' prompt
 ```
 
 ## Notes
