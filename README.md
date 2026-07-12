@@ -16,6 +16,33 @@ music / DJ library tidy end to end:
 A typical run goes: normalize the filenames, tag from the filenames, sync
 Rekordbox, and dedup, in that order.
 
+## Desktop app
+
+The same pipeline ships as a native Windows app under [`app/`](app/): pick your
+library folder, hit **Organize**, and review each destructive step (rename
+table, Rekordbox relink plan, duplicate list) before it happens. The app is a
+Tauri v2 + Rust rewrite of the four tools — no Python needed at runtime — and
+talks to Rekordbox's encrypted `master.db` through the
+[`rbox`](https://crates.io/crates/rbox) crate (always backing up first, and
+refusing to write while Rekordbox is running). Improvements over the CLI:
+embedded tags are read natively (no ffmpeg needed), stale Beatport-style WAV
+INFO chunks are fully replaced instead of shadowed, and the Rekordbox artist
+column is maintained directly so no manual "Reload Tag" is needed.
+
+Behavioral parity with the Python tools is pinned by fixtures generated from
+them (`tools/gen_fixtures.py` → `app/core/tests/fixtures/`); `cargo test` in
+`app/` runs the whole parity suite.
+
+```bash
+cd app
+npm install
+npm run tauri dev    # develop
+npm run tauri build  # produce the installer / exe
+```
+
+Licensing: the repository is MIT, **except `app/`, which is GPL-3.0-only**
+(see `app/LICENSE`) because it links the GPL-licensed `rbox` crate.
+
 ## Requirements
 
 - Python 3.8+

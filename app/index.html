@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Track Organizer</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-dot"></span>
+          <h1>Track Organizer</h1>
+        </div>
+        <button id="settings-btn" class="ghost" title="Settings">⚙</button>
+      </header>
+
+      <section class="card folder-card">
+        <div class="folder-info">
+          <span class="label">Library folder</span>
+          <span id="folder-path" class="path">No folder selected</span>
+        </div>
+        <button id="browse-btn" class="secondary">Browse…</button>
+      </section>
+
+      <button id="organize-btn" class="primary" disabled>Organize</button>
+
+      <section class="timeline">
+        <div class="step" id="step-normalize">
+          <div class="step-head">
+            <span class="dot"></span>
+            <span class="step-name">Normalize filenames</span>
+            <span class="chip pending">waiting</span>
+          </div>
+          <div class="step-detail"></div>
+        </div>
+        <div class="step" id="step-tag">
+          <div class="step-head">
+            <span class="dot"></span>
+            <span class="step-name">Write tags</span>
+            <span class="chip pending">waiting</span>
+          </div>
+          <div class="step-detail"></div>
+          <div class="progress hidden"><div class="bar"></div><span class="progress-text"></span></div>
+        </div>
+        <div class="step" id="step-rekordbox">
+          <div class="step-head">
+            <span class="dot"></span>
+            <span class="step-name">Sync Rekordbox</span>
+            <span class="chip pending">waiting</span>
+          </div>
+          <div class="step-detail"></div>
+        </div>
+        <div class="step" id="step-dedup">
+          <div class="step-head">
+            <span class="dot"></span>
+            <span class="step-name">Find duplicates</span>
+            <span class="chip pending">waiting</span>
+          </div>
+          <div class="step-detail"></div>
+        </div>
+      </section>
+
+      <section id="summary" class="card hidden"></section>
+    </div>
+
+    <!-- review modal -->
+    <div id="modal" class="overlay hidden">
+      <div class="modal">
+        <h2 id="modal-title"></h2>
+        <p id="modal-sub" class="sub"></p>
+        <div id="modal-body" class="modal-body"></div>
+        <div class="modal-actions">
+          <button id="modal-skip" class="ghost">Skip this step</button>
+          <span class="spacer"></span>
+          <button id="modal-cancel" class="secondary">Stop pipeline</button>
+          <button id="modal-ok" class="primary"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings drawer -->
+    <div id="drawer" class="overlay hidden">
+      <div class="drawer">
+        <h2>Settings</h2>
+        <label class="field">
+          <span>master.db path <em>(blank = auto-detect)</em></span>
+          <input id="set-db" type="text" placeholder="D:\PIONEER\Master\master.db" />
+        </label>
+        <label class="field">
+          <span>Backup folder <em>(blank = next to master.db)</em></span>
+          <input id="set-backup" type="text" placeholder="rekordbox_backups" />
+        </label>
+        <label class="field">
+          <span>Duplicates folder <em>(blank = &lt;library&gt;\_duplicates)</em></span>
+          <input id="set-dupes" type="text" />
+        </label>
+        <label class="check"><input id="set-alpha" type="checkbox" /> Sort artists alphabetically</label>
+        <label class="check"><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label>
+        <label class="check"><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label>
+        <label class="check"><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label>
+        <div class="modal-actions">
+          <span class="spacer"></span>
+          <button id="drawer-close" class="primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
