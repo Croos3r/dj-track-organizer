@@ -14,7 +14,7 @@ use unicode_properties::{GeneralCategory, UnicodeGeneralCategory};
 pub const AUDIO_EXT: [&str; 8] =
     [".mp3", ".wav", ".aiff", ".aif", ".aifc", ".flac", ".m4a", ".ogg"];
 
-fn quality_rank(ext: &str) -> i32 {
+pub(crate) fn quality_rank(ext: &str) -> i32 {
     match ext {
         ".wav" | ".aiff" | ".aif" | ".aifc" | ".flac" => 3,
         ".m4a" | ".ogg" | ".mp3" => 1,
@@ -61,7 +61,7 @@ pub enum Mode {
 }
 
 /// Python `strip_accents` + `norm_key`: normalised `artist|title` key.
-fn norm_key(artist: &str, title: &str) -> String {
+pub(crate) fn norm_key(artist: &str, title: &str) -> String {
     fn clean(x: &str) -> String {
         let stripped: String = x
             .nfkd()

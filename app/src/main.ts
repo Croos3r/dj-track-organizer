@@ -23,6 +23,14 @@ interface FileInfo { path: string; artist: string; title: string; dur: number | 
 interface DupGroup { kind: string; keeper: FileInfo; extras: FileInfo[] }
 interface DedupScan { groups: DupGroup[]; report_path: string; extras: number; scanned: number }
 interface MoveResult { moved: number; dest: string }
+interface RbEntry {
+  id: string; path: string; ext: string; title: string; created: string;
+  cue_ids: string[]; playlist_rows: [string, string][];
+  plays: number; rating: number; comment: string;
+}
+interface RbDupGroup { kind: string; keeper: RbEntry; extras: RbEntry[] }
+interface RbDedupScan { groups: RbDupGroup[]; entries: number; extras: number; report_path: string }
+interface RbDedupResult { removed: number; backup_path: string }
 interface Settings {
   last_folder: string | null; master_db: string | null;
   backup_dir: string | null; duplicates_dir: string | null;
@@ -46,7 +54,7 @@ let folder: string | null = null;
 
 // ---- step chrome ----------------------------------------------------------- //
 
-type StepId = "normalize" | "tag" | "rekordbox" | "dedup";
+type StepId = "normalize" | "tag" | "rekordbox" | "dedup" | "rbdedup";
 const stepEl = (id: StepId) => $(`#step-${id}`);
 
 function setStep(id: StepId, state: "pending" | "running" | "done" | "skipped" | "error",
@@ -61,7 +69,7 @@ function setStep(id: StepId, state: "pending" | "running" | "done" | "skipped" |
 }
 
 function resetSteps() {
-  (["normalize", "tag", "rekordbox", "dedup"] as StepId[]).forEach((id) =>
+  (["normalize", "tag", "rekordbox", "dedup", "rbdedup"] as StepId[]).forEach((id) =>
     setStep(id, "pending", "waiting"));
   $("#summary").classList.add("hidden");
   $("#summary").textContent = "";
@@ -314,6 +322,88 @@ async function stepDedup(): Promise<boolean> {
   return true;
 }
 
+async function stepRbDedup(): Promise<boolean> {
+  setStep("rbdedup", "running", "scanning…");
+  let scan: RbDedupScan;
+  try {
+    scan = await invoke<RbDedupScan>("rekordbox_dedup_scan", { folder, settings });
+  } catch (e) {
+    setStep("rbdedup", "error", "failed", String(e));
+    return true;
+  }
+  if (scan.groups.length === 0) {
+    setStep("rbdedup", "done", "collection clean",
+      `${scan.entries} collection entries checked, no duplicates`);
+    return true;
+  }
+
+  const wrap = el("div");
+  const info = (e: RbEntry) =>
+    `${e.cue_ids.length} cues · ${e.playlist_rows.length} playlists` +
+    (e.plays ? ` · ${e.plays} plays` : "") + (e.rating ? ` · ★${e.rating}` : "");
+  for (const [i, g] of scan.groups.entries()) {
+    const block = el("div", "group-block");
+    block.appendChild(el("div", "group-title",
+      `${g.kind === "same-file" ? "same file, several entries" : "same track, several entries"} — group ${i + 1}`));
+    const keep = el("div", "group-row");
+    keep.append(el("span", "keeper-star", "★"), el("span", "", basename(g.keeper.path)),
+      el("span", "size", info(g.keeper)));
+    block.appendChild(keep);
+    for (const x of g.extras) {
+      const row = el("div", "group-row");
+      row.append(el("span", "old-name", "✕"), el("span", "", basename(x.path)),
+        el("span", "size", info(x)));
+      block.appendChild(row);
+    }
+    wrap.appendChild(block);
+  }
+
+  // same running-gate as the relink step
+  const banner = el("div", "banner");
+  const bannerText = el("span", "",
+    "Rekordbox is running — close it fully, then hit Re-check.");
+  const recheck = el("button", "", "Re-check") as HTMLButtonElement;
+  banner.append(bannerText, recheck);
+  const okBtn = $("#modal-ok") as HTMLButtonElement;
+  const setRunning = (running: boolean) => {
+    banner.classList.toggle("hidden", !running);
+    okBtn.disabled = running;
+  };
+  recheck.onclick = async () => {
+    const s = await invoke<RekordboxStatus>("rekordbox_status", { settings });
+    setRunning(s.running);
+  };
+
+  const modalPromise = showModal({
+    title: `Remove ${scan.extras} duplicate collection entr${scan.extras > 1 ? "ies" : "y"}?`,
+    sub: `★ stays; playlist memberships move to it, and its cues are kept (or inherited if it has none). ` +
+         `A timestamped master.db backup is made first. Files on disk are not touched.`,
+    okLabel: "Back up & clean",
+    body: wrap,
+    banner,
+  });
+  invoke<RekordboxStatus>("rekordbox_status", { settings }).then((s) => setRunning(s.running));
+  const choice = await modalPromise;
+  okBtn.disabled = false;
+
+  if (!choice.ok && !choice.skip) return false;
+  if (choice.skip) {
+    setStep("rbdedup", "skipped", "skipped", `report written: rekordbox_duplicates.csv`);
+    return true;
+  }
+
+  setStep("rbdedup", "running", "cleaning…");
+  try {
+    const res = await invoke<RbDedupResult>("rekordbox_dedup_apply", {
+      settings, groups: scan.groups,
+    });
+    setStep("rbdedup", "done", `${res.removed} removed`, `backup: ${res.backup_path}`);
+  } catch (e) {
+    setStep("rbdedup", "error", "failed", String(e));
+  }
+  return true;
+}
+
 // ---- pipeline --------------------------------------------------------------- //
 
 let busy = false;
@@ -330,7 +420,9 @@ async function organize() {
     if (!aborted) {
       await stepTag();
       if (await stepRekordbox(mapping)) {
-        await stepDedup();
+        if (await stepDedup()) {
+          await stepRbDedup();
+        }
       }
     }
     showSummary(aborted);

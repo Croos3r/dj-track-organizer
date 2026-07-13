@@ -26,8 +26,10 @@ talks to Rekordbox's encrypted `master.db` through the
 [`rbox`](https://crates.io/crates/rbox) crate (always backing up first, and
 refusing to write while Rekordbox is running). Improvements over the CLI:
 embedded tags are read natively (no ffmpeg needed), stale Beatport-style WAV
-INFO chunks are fully replaced instead of shadowed, and the Rekordbox artist
-column is maintained directly so no manual "Reload Tag" is needed.
+INFO chunks are fully replaced instead of shadowed, the Rekordbox artist
+column is maintained directly so no manual "Reload Tag" is needed, and the
+collection-entry dedup (the CLI's --rekordbox-db mode) runs as a fifth
+pipeline step with its own review gate.
 
 Behavioral parity with the Python tools is pinned by fixtures generated from
 them (`tools/gen_fixtures.py` → `app/core/tests/fixtures/`); `cargo test` in

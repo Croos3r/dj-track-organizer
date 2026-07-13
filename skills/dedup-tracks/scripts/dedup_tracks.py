@@ -174,7 +174,8 @@ def rb_keeper(group):
     return ranked[0], ranked[1:]
 
 
-def rb_open_database():
+def rb_open_database(path=None):
+    """Open the Rekordbox database; `path` overrides the auto-detected one."""
     try:
         from pyrekordbox import MasterDatabase as _DB  # newer pyrekordbox
     except ImportError:
@@ -183,7 +184,7 @@ def rb_open_database():
         except ImportError:
             sys.exit("pyrekordbox is not installed. Run:  pip install pyrekordbox")
     try:
-        return _DB()
+        return _DB(path) if path else _DB()
     except Exception as e:  # noqa: BLE001
         sys.exit(f"Could not open the Rekordbox database: {e}\n"
                  "Make sure Rekordbox is installed and fully CLOSED.")
@@ -286,6 +287,10 @@ def rb_merge_into_keeper(db, keeper, extra):
     if not keeper["cues"] and extra["cues"]:
         for cue in extra["cues"]:
             cue.ContentID = keeper["id"]
+        # flush the repoint and drop the stale relationship collection, or
+        # SQLAlchemy's cascade NULLs the cues again when the row is deleted
+        db.session.flush()
+        db.session.expire(extra["row"], ["Cues"])
         keeper["cues"] = extra["cues"]
         extra["cues"] = []
     for cue in extra["cues"]:
@@ -294,7 +299,7 @@ def rb_merge_into_keeper(db, keeper, extra):
 
 
 def rekordbox_mode(args):
-    db = rb_open_database()
+    db = rb_open_database(args.db)
     db_file = rb_locate_db_file(db, args.db)
     print(f"master.db: {db_file or 'NOT FOUND (use --db to set it explicitly)'}")
 

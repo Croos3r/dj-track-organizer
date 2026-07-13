@@ -341,6 +341,77 @@ async fn rekordbox_apply(
 }
 
 // --------------------------------------------------------------------------- #
+// Step 3b: Rekordbox collection cleanup (duplicate entries in master.db)
+// --------------------------------------------------------------------------- #
+
+#[derive(Serialize)]
+struct RbDedupScan {
+    groups: Vec<rekordbox::RbDupGroup>,
+    entries: usize,
+    extras: usize,
+    report_path: String,
+}
+
+#[tauri::command]
+async fn rekordbox_dedup_scan(folder: String, settings: Settings) -> Result<RbDedupScan, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let db_path = resolve_db(&settings)?;
+        let mut db = rekordbox::open_db(Some(&db_path)).map_err(|e| e.to_string())?;
+        // scope to entries whose stored path mentions the library folder name
+        let folder_name = Path::new(&folder)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned());
+        let entries = rekordbox::load_rb_entries(&mut db, folder_name.as_deref())
+            .map_err(|e| e.to_string())?;
+        let n = entries.len();
+        let groups = rekordbox::find_rb_dup_groups(&entries);
+        let report_path = PathBuf::from(&folder).join("rekordbox_duplicates.csv");
+        let extras =
+            rekordbox::write_rb_dedup_report(&report_path, &groups).map_err(|e| e.to_string())?;
+        Ok(RbDedupScan {
+            groups,
+            entries: n,
+            extras,
+            report_path: report_path.to_string_lossy().into_owned(),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+struct RbDedupResult {
+    removed: usize,
+    backup_path: String,
+}
+
+#[tauri::command]
+async fn rekordbox_dedup_apply(
+    settings: Settings,
+    groups: Vec<rekordbox::RbDupGroup>,
+) -> Result<RbDedupResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if rekordbox::is_rekordbox_running() {
+            return Err("Rekordbox is running — close it fully first".to_string());
+        }
+        let db_path = resolve_db(&settings)?;
+        let backup_dir = settings
+            .backup_dir
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| db_path.parent().unwrap().join("rekordbox_backups"));
+        let backup = rekordbox::backup_db(&db_path, &backup_dir)
+            .map_err(|e| format!("backup failed ({e}); nothing was written"))?;
+        let mut db = rekordbox::open_db(Some(&db_path)).map_err(|e| e.to_string())?;
+        let removed =
+            rekordbox::apply_rb_dedup(&mut db, &groups, false).map_err(|e| e.to_string())?;
+        Ok(RbDedupResult { removed, backup_path: backup.to_string_lossy().into_owned() })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// --------------------------------------------------------------------------- #
 // Step 4: dedup
 // --------------------------------------------------------------------------- #
 
@@ -443,6 +514,8 @@ pub fn run() {
             rekordbox_status,
             rekordbox_plan,
             rekordbox_apply,
+            rekordbox_dedup_scan,
+            rekordbox_dedup_apply,
             dedup_scan,
             dedup_move
         ])

@@ -65,6 +65,33 @@ async function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise<
       };
     case "dedup_move":
       return { moved: (args?.extras as string[]).length, dest: "C:\\Track\\_duplicates" };
+    case "rekordbox_dedup_scan":
+      return {
+        entries: 1174, extras: 2, report_path: "…\\rekordbox_duplicates.csv",
+        groups: [
+          {
+            kind: "same-file",
+            keeper: { id: "1", path: "D:/Music/Track/Alpha - One.wav", ext: ".wav", title: "One",
+              created: "2026-01-01", cue_ids: ["a", "b"], playlist_rows: [["s1", "p1"]], plays: 3, rating: 0, comment: "" },
+            extras: [{ id: "2", path: "d:\\music\\track\\alpha - one.wav", ext: ".wav", title: "One",
+              created: "2026-02-01", cue_ids: [], playlist_rows: [], plays: 0, rating: 0, comment: "" }],
+          },
+          {
+            kind: "same-song",
+            keeper: { id: "3", path: "D:/Music/Track/Beta - Two.wav", ext: ".wav", title: "Two",
+              created: "2026-01-01", cue_ids: [], playlist_rows: [["s2", "p2"]], plays: 0, rating: 0, comment: "" },
+            extras: [{ id: "4", path: "D:/Music/Track/Beta - Two.mp3", ext: ".mp3", title: "Two",
+              created: "2026-01-01", cue_ids: ["c"], playlist_rows: [], plays: 0, rating: 5, comment: "" }],
+          },
+        ],
+      };
+    case "rekordbox_dedup_apply": {
+      const groups = (args?.groups ?? []) as { extras: unknown[] }[];
+      return {
+        removed: groups.reduce((n, g) => n + g.extras.length, 0),
+        backup_path: "…\\rekordbox_backups\\master.db.20260713.bak",
+      };
+    }
     default:
       throw new Error(`mock: unknown command ${cmd}`);
   }

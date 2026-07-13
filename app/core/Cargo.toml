@@ -9,7 +9,7 @@ description = "Core library for the DJ Track Organizer desktop app: filename nor
 default = ["rekordbox"]
 # Rekordbox master.db access sits behind a feature so the pure-logic modules
 # (normalize/tagging/dedup) can build and test without the SQLCipher toolchain.
-rekordbox = ["dep:rbox"]
+rekordbox = ["dep:rbox", "dep:diesel"]
 
 [dependencies]
 regex = "1"
@@ -23,8 +23,8 @@ serde_json = "1"
 chrono = "0.4"
 thiserror = "2"
 rbox = { version = "0.1.7", default-features = false, features = ["master-db", "bundled-vendored-openssl"], optional = true }
+# raw row ops (repoint/delete) against rbox's own schema; same diesel as rbox
+diesel = { version = "2.3", features = ["sqlite"], optional = true }
 
 [dev-dependencies]
 tempfile = "3"
-# synthetic master.db bootstrap in tests (same diesel as rbox)
-diesel = { version = "2.3", features = ["sqlite"] }
