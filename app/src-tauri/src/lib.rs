@@ -23,6 +23,9 @@ pub struct Settings {
     pub prefer_tags: bool,
     pub set_title: bool,
     pub refresh_artist: bool,
+    /// Worker threads for the file-heavy steps (tag reading/writing, dedup
+    /// hashing). 0 = auto (all cores); 1 = sequential.
+    pub max_threads: usize,
 }
 
 impl Default for Settings {
@@ -36,6 +39,7 @@ impl Default for Settings {
             prefer_tags: true,
             set_title: true,
             refresh_artist: true,
+            max_threads: 0,
         }
     }
 }
@@ -127,16 +131,18 @@ async fn scan_plan(folder: String, settings: Settings) -> Result<ScanResult, Str
         let opts = norm_options(&settings);
         let dir = PathBuf::from(&folder);
         let use_tags = settings.prefer_tags;
-        let tag_dir = dir.clone();
+        // Pre-read embedded tags in parallel (the only I/O in planning), keyed
+        // by filename, then let build_plan look them up. Skipped entirely when
+        // the user prefers filenames, which makes the scan pure CPU.
+        let tags: std::collections::HashMap<String, (String, String)> = if use_tags {
+            let paths = dedup::collect_audio_paths(&dir, false).map_err(|e| e.to_string())?;
+            dedup::read_tags_by_name(&paths, settings.max_threads)
+        } else {
+            std::collections::HashMap::new()
+        };
         let rows = normalize::build_plan(
             &dir,
-            move |name| {
-                if use_tags {
-                    tagging::read_tags(&tag_dir.join(name))
-                } else {
-                    None
-                }
-            },
+            move |name| tags.get(name).cloned(),
             &opts,
         )
         .map_err(|e| e.to_string())?;
@@ -213,8 +219,9 @@ struct TagResult {
 }
 
 #[tauri::command]
-async fn tag_folder(app: AppHandle, folder: String) -> Result<TagResult, String> {
+async fn tag_folder(app: AppHandle, folder: String, settings: Settings) -> Result<TagResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        use std::sync::atomic::{AtomicUsize, Ordering};
         let dir = PathBuf::from(&folder);
         let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
             .map_err(|e| e.to_string())?
@@ -228,33 +235,28 @@ async fn tag_folder(app: AppHandle, folder: String) -> Result<TagResult, String>
             .collect();
         files.sort();
         let total = files.len();
+
+        // Tag across worker threads (files are independent); each write retries
+        // transient locks internally. Progress is emitted from the workers.
+        let done = AtomicUsize::new(0);
+        let results = tagging::tag_files(&files, settings.max_threads, || {
+            let n = done.fetch_add(1, Ordering::Relaxed) + 1;
+            if n % 16 == 0 || n == total {
+                let _ = app.emit("tag-progress", TagProgress { done: n, total, file: String::new() });
+            }
+        });
+
         let mut tagged = 0;
         let mut skipped = 0;
         let mut errors = Vec::new();
-        for (i, path) in files.iter().enumerate() {
-            let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-            // tag writing is idempotent, so a transient lock (antivirus / the
-            // Windows search indexer briefly holding the file) is worth a short
-            // retry before we report it as an error.
-            let mut result = tagging::tag_file(path);
-            for delay in [50u64, 120, 300] {
-                match &result {
-                    Err(tagging::TagError::Io(e))
-                        if matches!(e.raw_os_error(), Some(32) | Some(33)) =>
-                    {
-                        std::thread::sleep(std::time::Duration::from_millis(delay));
-                        result = tagging::tag_file(path);
-                    }
-                    _ => break,
-                }
-            }
+        for (path, result) in results {
             match result {
                 Ok(tagging::TagStatus::Ok) => tagged += 1,
                 Ok(_) => skipped += 1,
-                Err(e) => errors.push((name.clone(), e.to_string())),
-            }
-            if i % 10 == 0 || i + 1 == total {
-                let _ = app.emit("tag-progress", TagProgress { done: i + 1, total, file: name });
+                Err(e) => errors.push((
+                    path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+                    e.to_string(),
+                )),
             }
         }
         Ok(TagResult { tagged, skipped, errors })
@@ -443,7 +445,10 @@ async fn dedup_scan(folder: String, settings: Settings) -> Result<DedupScan, Str
     tauri::async_runtime::spawn_blocking(move || {
         let dir = PathBuf::from(&folder);
         let use_tags = settings.prefer_tags;
-        let infos = dedup::scan(&dir, false, |p| {
+        // Parallel scan (tag reads) + parallel/smart hashing inside
+        // find_duplicates. Both preserve the exact output of the sequential
+        // baseline (see dedup::dedup_strategies_agree and the oracle parity).
+        let infos = dedup::scan_with(&dir, false, settings.max_threads, |p| {
             if use_tags {
                 tagging::read_tags(p).map(|(a, t)| (a, t, None))
             } else {
@@ -452,7 +457,9 @@ async fn dedup_scan(folder: String, settings: Settings) -> Result<DedupScan, Str
         })
         .map_err(|e| e.to_string())?;
         let scanned = infos.len();
-        let groups = dedup::find_duplicates(&infos, dedup::Mode::Both).map_err(|e| e.to_string())?;
+        let strat = dedup::HashStrategy { parallelism: settings.max_threads, ..Default::default() };
+        let groups = dedup::find_duplicates_with(&infos, dedup::Mode::Both, strat)
+            .map_err(|e| e.to_string())?;
         let report_path = dir.join("duplicates.csv");
         let extras = dedup::write_report(&report_path, &groups).map_err(|e| e.to_string())?;
         Ok(DedupScan {

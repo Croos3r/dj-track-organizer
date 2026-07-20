@@ -108,6 +108,10 @@
         <label class="check"><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label>
         <label class="check"><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label>
         <label class="check"><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label>
+        <label class="field">
+          <span>Worker threads <em>(0 = auto / all cores, 1 = sequential)</em></span>
+          <input id="set-threads" type="number" min="0" step="1" />
+        </label>
         <div class="modal-actions">
           <span class="spacer"></span>
           <button id="drawer-close" class="primary">Done</button>

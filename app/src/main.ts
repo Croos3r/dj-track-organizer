@@ -36,6 +36,7 @@ interface Settings {
   backup_dir: string | null; duplicates_dir: string | null;
   alphabetical_artists: boolean; prefer_tags: boolean;
   set_title: boolean; refresh_artist: boolean;
+  max_threads: number;
 }
 
 // ---- tiny dom helpers ------------------------------------------------------ //
@@ -175,7 +176,7 @@ async function stepTag(): Promise<boolean> {
     },
   );
   try {
-    const res = await invoke<TagResult>("tag_folder", { folder });
+    const res = await invoke<TagResult>("tag_folder", { folder, settings });
     const errNote = res.errors.length ? `, ${res.errors.length} errors` : "";
     setStep("tag", res.errors.length ? "error" : "done",
       `${res.tagged} tagged`,
@@ -470,6 +471,7 @@ function bindSettingsDrawer() {
     ($("#set-tags") as HTMLInputElement).checked = settings.prefer_tags;
     ($("#set-title") as HTMLInputElement).checked = settings.set_title;
     ($("#set-artist") as HTMLInputElement).checked = settings.refresh_artist;
+    ($("#set-threads") as HTMLInputElement).value = String(settings.max_threads ?? 0);
     drawer.classList.remove("hidden");
   };
   $("#drawer-close").onclick = async () => {
@@ -484,6 +486,7 @@ function bindSettingsDrawer() {
       prefer_tags: c("#set-tags"),
       set_title: c("#set-title"),
       refresh_artist: c("#set-artist"),
+      max_threads: Math.max(0, parseInt(($("#set-threads") as HTMLInputElement).value, 10) || 0),
     };
     await invoke("save_settings", { settings });
     drawer.classList.add("hidden");

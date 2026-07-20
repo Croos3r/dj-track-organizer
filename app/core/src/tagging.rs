@@ -10,7 +10,9 @@
 //! behavior difference of the port.
 
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
 
 pub const SUPPORTED: [&str; 5] = [".wav", ".mp3", ".aiff", ".aif", ".aifc"];
 
@@ -397,6 +399,44 @@ pub fn tag_file(path: &Path) -> Result<TagStatus, TagError> {
         _ => return Ok(TagStatus::SkipExt),
     }
     Ok(TagStatus::Ok)
+}
+
+/// [`tag_file`] with a short retry on a transient Windows sharing/lock
+/// violation (antivirus or the search indexer briefly holding the file). Tag
+/// writing is idempotent, so retrying is safe.
+pub fn tag_file_resilient(path: &Path) -> Result<TagStatus, TagError> {
+    let mut result = tag_file(path);
+    for delay in [50u64, 120, 300] {
+        match &result {
+            Err(TagError::Io(e)) if matches!(e.raw_os_error(), Some(32) | Some(33)) => {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                result = tag_file(path);
+            }
+            _ => break,
+        }
+    }
+    result
+}
+
+/// Tag many files, optionally across `parallelism` threads (0 = all cores,
+/// 1 = sequential). Files are independent, so this scales with cores/disk.
+/// `on_each` is called once per finished file (from worker threads) for
+/// progress reporting. Results come back in the same order as `paths`.
+pub fn tag_files(
+    paths: &[PathBuf],
+    parallelism: usize,
+    on_each: impl Fn() + Sync,
+) -> Vec<(PathBuf, Result<TagStatus, TagError>)> {
+    let run = |p: &PathBuf| {
+        let r = tag_file_resilient(p);
+        on_each();
+        (p.clone(), r)
+    };
+    if parallelism == 1 {
+        paths.iter().map(run).collect()
+    } else {
+        crate::parallel::run_in_pool(parallelism, || paths.par_iter().map(run).collect())
+    }
 }
 
 /// Embedded (artist, title) via lofty; `None` when the file has no readable

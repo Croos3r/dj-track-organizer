@@ -23,7 +23,7 @@ async function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise<
       return {
         last_folder: "C:\\Users\\You\\Music\\Track", master_db: null, backup_dir: null,
         duplicates_dir: null, alphabetical_artists: true, prefer_tags: true,
-        set_title: true, refresh_artist: true,
+        set_title: true, refresh_artist: true, max_threads: 0,
       };
     case "save_settings": return null;
     case "pick_folder": return "C:\\Users\\You\\Music\\Track";
