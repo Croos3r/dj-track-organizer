@@ -169,7 +169,7 @@ async function stepTag(): Promise<boolean> {
   const txt = prog.querySelector(".progress-text") as HTMLElement;
   const unlisten = await listen<{ done: number; total: number; file: string }>(
     "tag-progress",
-    (e) => {
+    (e: { payload: { done: number; total: number; file: string } }) => {
       const { done, total } = e.payload;
       bar.style.width = `${Math.round((done / Math.max(total, 1)) * 100)}%`;
       txt.textContent = `${done} / ${total}`;
