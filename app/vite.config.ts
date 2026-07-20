@@ -6,6 +6,9 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
-    watch: { ignored: ["**/src-tauri/**"] },
+    // Never watch Rust sources or the Cargo target dir: `target/` sits inside
+    // this Vite root (workspace layout) and its build artifacts (the app DLL)
+    // get locked mid-compile, which crashes chokidar with EBUSY.
+    watch: { ignored: ["**/src-tauri/**", "**/target/**"] },
   },
 });

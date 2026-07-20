@@ -378,6 +378,11 @@ pub struct RenameOutcome {
 /// Deviations from the oracle (safety fixes, covered by unit tests):
 /// - every source is checked before anything is touched, so a stale plan
 ///   cannot abort halfway with temp files on disk;
+/// - each rename retries briefly on a transient Windows sharing/lock violation
+///   (antivirus / search indexer holding the file), see [`crate::retry`];
+/// - if a source rename still fails after retries, every temp file already
+///   created is rolled back to its original name before returning the error,
+///   so a locked file never leaves the folder in a half-renamed state;
 /// - if a skipped file cannot be restored to its old name because another
 ///   rename claimed it, it is restored to "old (2)" instead of crashing.
 pub fn two_phase_rename(
@@ -392,17 +397,35 @@ pub fn two_phase_rename(
             ));
         }
     }
+    let rename = |from: &Path, to: &Path| {
+        crate::retry::on_lock(|| std::fs::rename(from, to))
+    };
+
+    // Phase 1: source -> temp. On failure, undo the temps done so far.
     let ts = chrono::Utc::now().timestamp();
     let mut tmp = Vec::new();
     for (i, (old, new)) in changes.iter().enumerate() {
         let t = folder.join(format!(".__norm_{i}_{ts}.tmp"));
-        std::fs::rename(folder.join(old), &t)?;
+        if let Err(e) = rename(&folder.join(old), &t) {
+            for (done_t, _, done_old) in tmp.iter().rev() {
+                let _ = std::fs::rename(done_t, &folder.join(done_old));
+            }
+            return Err(std::io::Error::new(
+                e.kind(),
+                format!("could not rename {old:?} (in use by another process?); \
+                         no files were changed: {e}"),
+            ));
+        }
         tmp.push((t, new.clone(), old.clone()));
     }
+
+    // Phase 2: temp -> final. A hard failure here restores the remaining temps
+    // to their original names so nothing is left as a .tmp.
     let mut out = RenameOutcome::default();
-    for (t, new, old) in tmp {
+    let mut pending = tmp.into_iter();
+    while let Some((t, new, old)) = pending.next() {
         let dst = folder.join(&new);
-        if dst.exists() {
+        let result = if dst.exists() {
             let mut restore = folder.join(&old);
             let mut n = 2;
             while restore.exists() {
@@ -410,11 +433,20 @@ pub fn two_phase_rename(
                 restore = folder.join(format!("{root} ({n}){ext}"));
                 n += 1;
             }
-            std::fs::rename(&t, &restore)?;
-            out.skipped.push((old, new));
+            rename(&t, &restore).map(|()| out.skipped.push((old.clone(), new.clone())))
         } else {
-            std::fs::rename(&t, &dst)?;
-            out.done.push((old, new));
+            rename(&t, &dst).map(|()| out.done.push((old.clone(), new.clone())))
+        };
+        if let Err(e) = result {
+            let _ = std::fs::rename(&t, &folder.join(&old));
+            for (rt, _, ro) in pending {
+                let _ = std::fs::rename(&rt, &folder.join(ro));
+            }
+            return Err(std::io::Error::new(
+                e.kind(),
+                format!("could not finish renaming {old:?} (in use by another \
+                         process?); other files were restored: {e}"),
+            ));
         }
     }
     Ok(out)

@@ -8,6 +8,7 @@
 pub mod csvio;
 pub mod dedup;
 pub mod normalize;
+pub mod retry;
 pub mod tagging;
 
 #[cfg(feature = "rekordbox")]

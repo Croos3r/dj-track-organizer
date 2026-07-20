@@ -320,12 +320,13 @@ pub fn move_extras(groups: &[DupGroup], dest: &Path) -> std::io::Result<Vec<(Pat
                 target = dest.join(format!("{root} ({n}){ext}"));
                 n += 1;
             }
-            match std::fs::rename(&e.path, &target) {
+            match crate::retry::on_lock(|| std::fs::rename(&e.path, &target)) {
                 Ok(()) => {}
                 Err(_) => {
-                    // cross-volume fallback, like shutil.move
-                    std::fs::copy(&e.path, &target)?;
-                    std::fs::remove_file(&e.path)?;
+                    // cross-volume fallback, like shutil.move; each step also
+                    // retries a transient lock (antivirus / search indexer)
+                    crate::retry::on_lock(|| std::fs::copy(&e.path, &target).map(|_| ()))?;
+                    crate::retry::on_lock(|| std::fs::remove_file(&e.path))?;
                 }
             }
             moved.push((e.path.clone(), target));

@@ -233,7 +233,22 @@ async fn tag_folder(app: AppHandle, folder: String) -> Result<TagResult, String>
         let mut errors = Vec::new();
         for (i, path) in files.iter().enumerate() {
             let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-            match tagging::tag_file(path) {
+            // tag writing is idempotent, so a transient lock (antivirus / the
+            // Windows search indexer briefly holding the file) is worth a short
+            // retry before we report it as an error.
+            let mut result = tagging::tag_file(path);
+            for delay in [50u64, 120, 300] {
+                match &result {
+                    Err(tagging::TagError::Io(e))
+                        if matches!(e.raw_os_error(), Some(32) | Some(33)) =>
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(delay));
+                        result = tagging::tag_file(path);
+                    }
+                    _ => break,
+                }
+            }
+            match result {
                 Ok(tagging::TagStatus::Ok) => tagged += 1,
                 Ok(_) => skipped += 1,
                 Err(e) => errors.push((name.clone(), e.to_string())),
