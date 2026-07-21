@@ -442,7 +442,7 @@ pub fn two_phase_rename(
         let t = folder.join(format!(".__norm_{i}_{ts}.tmp"));
         if let Err(e) = rename(&folder.join(old), &t) {
             for (done_t, _, done_old) in tmp.iter().rev() {
-                let _ = std::fs::rename(done_t, &folder.join(done_old));
+                let _ = std::fs::rename(done_t, folder.join(done_old));
             }
             return Err(std::io::Error::new(
                 e.kind(),
@@ -474,9 +474,9 @@ pub fn two_phase_rename(
             rename(&t, &dst).map(|()| out.done.push((old.clone(), new.clone())))
         };
         if let Err(e) = result {
-            let _ = std::fs::rename(&t, &folder.join(&old));
+            let _ = std::fs::rename(&t, folder.join(&old));
             for (rt, _, ro) in pending {
-                let _ = std::fs::rename(&rt, &folder.join(ro));
+                let _ = std::fs::rename(&rt, folder.join(ro));
             }
             return Err(std::io::Error::new(
                 e.kind(),

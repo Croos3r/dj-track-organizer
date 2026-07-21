@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn missing_files_are_counted_with_a_bounded_sample() {
         use super::missing_rekordbox_files;
-        use organizer_core::rekordbox::RbEntry;
+        use crate::rekordbox::RbEntry;
 
         let td = tempfile::tempdir().unwrap();
         let existing = td.path().join("exists.wav");
