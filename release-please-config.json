@@ -1,0 +1,10 @@
+{
+  "release-type": "simple",
+  "packages": {
+    ".": {
+      "component": "track-organizer",
+      "package-name": "track-organizer",
+      "include-component-in-tag": false
+    }
+  }
+}

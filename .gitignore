@@ -4,3 +4,4 @@ __pycache__/
 rename_plan.csv
 rename_rollback.csv
 rekordbox_backups/
+app/target-health/

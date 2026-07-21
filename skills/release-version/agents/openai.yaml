@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Version"
+  short_description: "Release a version from validation through publishing"
+  default_prompt: "Use $release-version to prepare, tag, document, and publish a new release end to end."

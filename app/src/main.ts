@@ -31,6 +31,22 @@ interface RbEntry {
 interface RbDupGroup { kind: string; keeper: RbEntry; extras: RbEntry[] }
 interface RbDedupScan { groups: RbDupGroup[]; entries: number; extras: number; report_path: string }
 interface RbDedupResult { removed: number; backup_path: string }
+interface HealthIssue {
+  id: string; severity: "info" | "warning" | "critical";
+  title: string; count: number; description: string;
+}
+interface RekordboxHealth {
+  db_path: string; exists: boolean; running: boolean;
+  missing_files: number; missing_file_samples: string[];
+  collection_duplicate_groups: number; collection_duplicate_extras: number;
+  inspection_error: string | null;
+}
+interface HealthReport {
+  scanned_at: string; folder: string; score: number;
+  audio_files: number; rename_issues: number; manual_review: number;
+  file_duplicate_groups: number; file_duplicate_extras: number;
+  rekordbox: RekordboxHealth | null; issues: HealthIssue[];
+}
 interface Settings {
   last_folder: string | null; master_db: string | null;
   backup_dir: string | null; duplicates_dir: string | null;
@@ -52,6 +68,7 @@ const esc = (s: string) => s; // textContent everywhere; no innerHTML with data
 
 let settings: Settings;
 let folder: string | null = null;
+let healthBusy = false;
 
 // ---- step chrome ----------------------------------------------------------- //
 
@@ -76,13 +93,143 @@ function resetSteps() {
   $("#summary").textContent = "";
 }
 
+// ---- library health -------------------------------------------------------- //
+
+function healthScoreLabel(score: number): string {
+  if (score >= 90) return "Healthy";
+  if (score >= 60) return "Needs attention";
+  return "Critical";
+}
+
+function healthCard(value: number, label: string): HTMLElement {
+  const card = el("div", "health-card");
+  card.append(el("span", "health-card-value", String(value)), el("span", "health-card-label", label));
+  return card;
+}
+
+function healthActionLabel(id: string): string | null {
+  switch (id) {
+    case "rename-issues": return "Review organize";
+    case "file-duplicates": return "Review duplicates";
+    case "collection-duplicates": return "Review collection";
+    case "missing-rekordbox-files": return "View paths";
+    default: return null;
+  }
+}
+
+async function showMissingFileSamples(report: HealthReport) {
+  const samples = report.rekordbox?.missing_file_samples ?? [];
+  const body = el("div");
+  if (samples.length === 0) {
+    body.appendChild(el("p", "sub", "No sample paths were returned."));
+  } else {
+    const list = el("ul", "health-sample-list");
+    samples.forEach((path) => list.appendChild(el("li", "mono", path)));
+    body.appendChild(list);
+  }
+  await showModal({
+    title: `${report.rekordbox?.missing_files ?? 0} missing Rekordbox file${(report.rekordbox?.missing_files ?? 0) === 1 ? "" : "s"}`,
+    sub: "Repair workflow not available yet. These paths are samples from the read-only scan.",
+    okLabel: "Close",
+    cancelLabel: "Close",
+    allowSkip: false,
+    body,
+  });
+}
+
+async function runHealthAction(id: string, report: HealthReport) {
+  if (busy || healthBusy || !folder) return;
+  if (id === "rename-issues") {
+    $("#organize-btn").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#organize-btn").focus();
+  } else if (id === "file-duplicates") {
+    await stepDedup();
+  } else if (id === "collection-duplicates") {
+    await stepRbDedup();
+  } else if (id === "missing-rekordbox-files") {
+    await showMissingFileSamples(report);
+  }
+}
+
+function renderHealthReport(report: HealthReport) {
+  const rb = report.rekordbox;
+  $("#health-score").textContent = String(report.score);
+  $("#health-score-label").textContent = healthScoreLabel(report.score);
+  $("#health-scanned-at").textContent = `Scanned ${new Date(report.scanned_at).toLocaleString()}`;
+  $("#health-status").textContent = "Read-only scan complete.";
+  $("#health-empty").classList.add("hidden");
+  $("#health-results").classList.remove("hidden");
+
+  const cards = $("#health-cards");
+  cards.textContent = "";
+  cards.append(
+    healthCard(report.audio_files, "files scanned"),
+    healthCard(report.rename_issues, "rename issues"),
+    healthCard(report.file_duplicate_extras, "duplicate files"),
+    healthCard(rb?.missing_files ?? 0, "missing RB files"),
+    healthCard(rb?.collection_duplicate_extras ?? 0, "collection duplicates"),
+  );
+
+  const issues = $("#health-issues");
+  issues.textContent = "";
+  report.issues.forEach((issue) => {
+    const row = el("div", `health-issue severity-${issue.severity}`);
+    row.appendChild(el("span", "health-severity"));
+    const copy = el("div", "health-issue-copy");
+    const title = el("div", "health-issue-title", issue.title);
+    if (issue.count > 0) title.appendChild(el("span", "health-issue-count", `(${issue.count})`));
+    copy.append(title, el("div", "health-issue-description", issue.description));
+    row.appendChild(copy);
+    const action = healthActionLabel(issue.id);
+    if (action) {
+      const button = el("button", "secondary", action) as HTMLButtonElement;
+      button.onclick = () => { void runHealthAction(issue.id, report); };
+      row.appendChild(button);
+    }
+    issues.appendChild(row);
+  });
+}
+
+async function scanHealth() {
+  if (!folder || healthBusy) return;
+  healthBusy = true;
+  const button = $("#health-scan-btn") as HTMLButtonElement;
+  button.disabled = true;
+  button.textContent = "Checkingâ€¦";
+  $("#health-status").textContent = "Scanning libraryâ€¦";
+  $("#health-empty").classList.add("hidden");
+  $("#health-results").classList.add("hidden");
+  $("#health-progress").classList.remove("hidden");
+  try {
+    const report = await invoke<HealthReport>("health_scan", { folder, settings });
+    renderHealthReport(report);
+  } catch (error) {
+    $("#health-status").textContent = "Scan failed.";
+    $("#health-empty").textContent = String(error);
+    $("#health-empty").classList.remove("hidden");
+  } finally {
+    healthBusy = false;
+    button.disabled = !folder;
+    button.textContent = "Check library";
+    $("#health-progress").classList.add("hidden");
+  }
+}
+
+function resetHealthForFolder() {
+  $("#health-scan-btn").removeAttribute("disabled");
+  $("#health-status").textContent = "Folder selected. Run a new read-only scan.";
+  $("#health-empty").textContent = "Your latest scan will appear here.";
+  $("#health-empty").classList.remove("hidden");
+  $("#health-results").classList.add("hidden");
+}
+
 // ---- modal ----------------------------------------------------------------- //
 
 interface ModalChoice { ok: boolean; skip: boolean }
 
 function showModal(opts: {
   title: string; sub: string; okLabel: string;
-  body?: HTMLElement; banner?: HTMLElement; allowSkip?: boolean;
+  body?: HTMLElement; banner?: HTMLElement; allowSkip?: boolean; cancelLabel?: string;
 }): Promise<ModalChoice> {
   return new Promise((resolve) => {
     $("#modal-title").textContent = opts.title;
@@ -95,6 +242,7 @@ function showModal(opts: {
     ok.textContent = opts.okLabel;
     const skip = $("#modal-skip") as HTMLButtonElement;
     skip.classList.toggle("hidden", opts.allowSkip === false);
+    $("#modal-cancel").textContent = opts.cancelLabel ?? "Stop pipeline";
     $("#modal").classList.remove("hidden");
 
     const done = (choice: ModalChoice) => {
@@ -498,6 +646,7 @@ async function setFolder(path: string | null) {
   folder = path;
   $("#folder-path").textContent = path;
   ($("#organize-btn") as HTMLButtonElement).disabled = false;
+  resetHealthForFolder();
   settings = { ...settings, last_folder: path };
   await invoke("save_settings", { settings });
 }
@@ -511,6 +660,7 @@ async function main() {
     await setFolder(picked);
   };
   $("#organize-btn").onclick = organize;
+  $("#health-scan-btn").onclick = scanHealth;
   resetSteps();
 }
 

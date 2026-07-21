@@ -28,6 +28,54 @@ async function mockInvoke(cmd: string, args?: Record<string, unknown>): Promise<
     case "save_settings": return null;
     case "pick_folder": return "C:\\Users\\You\\Music\\Track";
     case "reveal_path": return null;
+    case "health_scan":
+      return {
+        scanned_at: new Date().toISOString(),
+        folder: "C:\\Users\\You\\Music\\Track",
+        score: 74,
+        audio_files: 1172,
+        rename_issues: 2,
+        manual_review: 1,
+        file_duplicate_groups: 1,
+        file_duplicate_extras: 1,
+        rekordbox: {
+          db_path: "D:\\PIONEER\\Master\\master.db",
+          exists: true,
+          running: false,
+          missing_files: 3,
+          missing_file_samples: [
+            "D:\\Music\\Track\\Missing Artist - Missing Song.wav",
+            "D:\\Music\\Track\\Old Name.mp3",
+          ],
+          collection_duplicate_groups: 1,
+          collection_duplicate_extras: 2,
+          inspection_error: null,
+        },
+        issues: [
+          {
+            id: "rename-issues", severity: "warning", title: "Files need renaming",
+            count: 2, description: "The existing Organize flow can review these filename changes before applying them.",
+          },
+          {
+            id: "manual-review", severity: "warning", title: "Files need manual naming",
+            count: 1, description: "The normalizer could not confidently derive both an artist and a title.",
+          },
+          {
+            id: "file-duplicates", severity: "warning", title: "Duplicate files found",
+            count: 1, description: "1 duplicate group found. Review the existing duplicate workflow before moving anything.",
+          },
+          {
+            id: "missing-rekordbox-files", severity: "critical",
+            title: "Rekordbox files missing from disk", count: 3,
+            description: "Some collection entries point to files that are no longer present. A repair workflow is not available yet.",
+          },
+          {
+            id: "collection-duplicates", severity: "warning",
+            title: "Duplicate Rekordbox entries found", count: 2,
+            description: "Review the existing collection cleanup workflow before changing master.db.",
+          },
+        ],
+      };
     case "scan_plan":
       return {
         rows: mockRows, total: 1172, to_rename: 2, already_correct: 1169,

@@ -3,79 +3,161 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171316" />
     <title>Track Organizer</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app">
-      <header class="topbar">
+      <header class="topbar" aria-label="Track Organizer header">
         <div class="brand">
-          <span class="brand-dot"></span>
-          <h1>Track Organizer</h1>
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <div class="brand-copy">
+            <span class="brand-kicker">STUDIO TOOL / 01</span>
+            <h1>Track Organizer</h1>
+          </div>
         </div>
-        <button id="settings-btn" class="ghost" title="Settings">⚙</button>
+        <div class="topbar-meta">
+          <span class="session-state"><span class="session-dot" aria-hidden="true"></span>Local library</span>
+          <button id="settings-btn" class="ghost settings-trigger" title="Settings" aria-label="Open settings">
+            <span class="settings-glyph" aria-hidden="true">+</span>
+            <span>Settings</span>
+          </button>
+        </div>
       </header>
 
-      <section class="card folder-card">
-        <div class="folder-info">
-          <span class="label">Library folder</span>
-          <span id="folder-path" class="path">No folder selected</span>
-        </div>
-        <button id="browse-btn" class="secondary">Browse…</button>
-      </section>
+      <main class="workspace">
+        <section class="intro" aria-labelledby="workspace-title">
+          <div>
+            <p class="eyebrow">PREP DESK</p>
+            <h2 id="workspace-title">Make the library ready for the room.</h2>
+          </div>
+          <p class="intro-note">A careful pass over names, tags, collection links and duplicates.</p>
+        </section>
 
-      <button id="organize-btn" class="primary" disabled>Organize</button>
+        <section class="card folder-card" aria-labelledby="library-heading">
+          <div class="folder-info">
+            <div class="section-label-row">
+              <span class="index-label">01</span>
+              <span id="library-heading" class="label">Library folder</span>
+            </div>
+            <span id="folder-path" class="path">No folder selected</span>
+            <span class="folder-hint">Choose the folder that holds your working audio library.</span>
+          </div>
+          <button id="browse-btn" class="secondary browse-button">Browse<span aria-hidden="true">&hellip;</span></button>
+        </section>
 
-      <section class="timeline">
-        <div class="step" id="step-normalize">
-          <div class="step-head">
-            <span class="dot"></span>
-            <span class="step-name">Normalize filenames</span>
-            <span class="chip pending">waiting</span>
+        <section id="health-dashboard" class="card health-dashboard" aria-labelledby="health-heading">
+          <div class="health-head">
+            <div>
+              <div class="section-label-row">
+                <span class="index-label">02</span>
+                <span class="label">Signal check</span>
+              </div>
+              <h2 id="health-heading">Library health</h2>
+              <p id="health-status" class="sub">Select a library folder to scan.</p>
+            </div>
+            <button id="health-scan-btn" class="secondary" disabled>Check library</button>
           </div>
-          <div class="step-detail"></div>
-        </div>
-        <div class="step" id="step-tag">
-          <div class="step-head">
-            <span class="dot"></span>
-            <span class="step-name">Write tags</span>
-            <span class="chip pending">waiting</span>
+          <div class="health-note"><span class="note-mark" aria-hidden="true">i</span>Read-only scan &mdash; no changes will be made</div>
+          <div id="health-progress" class="health-progress hidden" role="status" aria-live="polite">
+            <div class="health-progress-bar" aria-hidden="true"></div>
+            <span>Checking filenames, duplicates, and Rekordbox&hellip;</span>
           </div>
-          <div class="step-detail"></div>
-          <div class="progress hidden"><div class="bar"></div><span class="progress-text"></span></div>
-        </div>
-        <div class="step" id="step-rekordbox">
-          <div class="step-head">
-            <span class="dot"></span>
-            <span class="step-name">Sync Rekordbox</span>
-            <span class="chip pending">waiting</span>
+          <div id="health-empty" class="health-empty">Your latest scan will appear here.</div>
+          <div id="health-results" class="hidden">
+            <div class="health-score-row">
+              <div class="health-score-block">
+                <span class="label">Overall score</span>
+                <div class="score-line"><strong id="health-score">&mdash;</strong><span id="health-score-label" class="health-score-label"></span></div>
+              </div>
+              <span id="health-scanned-at" class="label"></span>
+            </div>
+            <div id="health-cards" class="health-cards"></div>
+            <div class="health-issues-section">
+              <div class="health-section-title">Issues to review</div>
+              <div id="health-issues" class="health-issues"></div>
+            </div>
           </div>
-          <div class="step-detail"></div>
-        </div>
-        <div class="step" id="step-dedup">
-          <div class="step-head">
-            <span class="dot"></span>
-            <span class="step-name">Find duplicates</span>
-            <span class="chip pending">waiting</span>
-          </div>
-          <div class="step-detail"></div>
-        </div>
-        <div class="step" id="step-rbdedup">
-          <div class="step-head">
-            <span class="dot"></span>
-            <span class="step-name">Clean Rekordbox collection</span>
-            <span class="chip pending">waiting</span>
-          </div>
-          <div class="step-detail"></div>
-        </div>
-      </section>
+        </section>
 
-      <section id="summary" class="card hidden"></section>
+        <section class="organize-section" aria-labelledby="organize-heading">
+          <div class="section-label-row">
+            <span class="index-label">03</span>
+            <span id="organize-heading" class="label">Run the set</span>
+          </div>
+          <button id="organize-btn" class="primary organize-button" disabled>
+            <span>Organize library</span>
+            <span class="button-arrow" aria-hidden="true">&rarr;</span>
+          </button>
+          <p class="organize-note">Each stage pauses for review before it makes a change.</p>
+        </section>
+
+        <section class="timeline" aria-labelledby="pipeline-heading">
+          <div class="timeline-heading">
+            <div>
+              <p class="eyebrow">PIPELINE</p>
+              <h2 id="pipeline-heading">The handoff</h2>
+            </div>
+            <span class="timeline-caption">Review gates / 05 stages</span>
+          </div>
+          <div class="pipeline-list">
+            <div class="step" id="step-normalize">
+              <div class="step-head">
+                <span class="step-index" aria-hidden="true">01</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span class="step-name">Normalize filenames</span>
+                <span class="chip pending">waiting</span>
+              </div>
+              <div class="step-detail"></div>
+            </div>
+            <div class="step" id="step-tag">
+              <div class="step-head">
+                <span class="step-index" aria-hidden="true">02</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span class="step-name">Write tags</span>
+                <span class="chip pending">waiting</span>
+              </div>
+              <div class="step-detail"></div>
+              <div class="progress hidden" role="progressbar" aria-label="Tagging progress"><div class="bar"></div><span class="progress-text"></span></div>
+            </div>
+            <div class="step" id="step-rekordbox">
+              <div class="step-head">
+                <span class="step-index" aria-hidden="true">03</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span class="step-name">Sync Rekordbox</span>
+                <span class="chip pending">waiting</span>
+              </div>
+              <div class="step-detail"></div>
+            </div>
+            <div class="step" id="step-dedup">
+              <div class="step-head">
+                <span class="step-index" aria-hidden="true">04</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span class="step-name">Find duplicates</span>
+                <span class="chip pending">waiting</span>
+              </div>
+              <div class="step-detail"></div>
+            </div>
+            <div class="step" id="step-rbdedup">
+              <div class="step-head">
+                <span class="step-index" aria-hidden="true">05</span>
+                <span class="dot" aria-hidden="true"></span>
+                <span class="step-name">Clean Rekordbox collection</span>
+                <span class="chip pending">waiting</span>
+              </div>
+              <div class="step-detail"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="summary" class="card hidden" aria-live="polite"></section>
+      </main>
     </div>
 
-    <!-- review modal -->
-    <div id="modal" class="overlay hidden">
-      <div class="modal">
+    <div id="modal" class="overlay hidden" role="presentation">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-sub">
+        <div class="dialog-kicker">REVIEW GATE</div>
         <h2 id="modal-title"></h2>
         <p id="modal-sub" class="sub"></p>
         <div id="modal-body" class="modal-body"></div>
@@ -88,33 +170,36 @@
       </div>
     </div>
 
-    <!-- settings drawer -->
-    <div id="drawer" class="overlay hidden">
-      <div class="drawer">
-        <h2>Settings</h2>
-        <label class="field">
-          <span>master.db path <em>(blank = auto-detect)</em></span>
-          <input id="set-db" type="text" placeholder="D:\PIONEER\Master\master.db" />
-        </label>
-        <label class="field">
-          <span>Backup folder <em>(blank = next to master.db)</em></span>
-          <input id="set-backup" type="text" placeholder="rekordbox_backups" />
-        </label>
-        <label class="field">
-          <span>Duplicates folder <em>(blank = &lt;library&gt;\_duplicates)</em></span>
-          <input id="set-dupes" type="text" />
-        </label>
-        <label class="check"><input id="set-alpha" type="checkbox" /> Sort artists alphabetically</label>
-        <label class="check"><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label>
-        <label class="check"><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label>
-        <label class="check"><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label>
-        <label class="field">
-          <span>Worker threads <em>(0 = auto / all cores, 1 = sequential)</em></span>
-          <input id="set-threads" type="number" min="0" step="1" />
-        </label>
+    <div id="drawer" class="overlay hidden" role="presentation">
+      <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+        <div class="dialog-kicker">WORKSPACE CONFIG</div>
+        <h2 id="settings-heading">Settings</h2>
+        <p class="sub">Defaults for this booth. Blank paths use the app's automatic locations.</p>
+        <div class="settings-fields">
+          <label class="field">
+            <span>master.db path <em>(blank = auto-detect)</em></span>
+            <input id="set-db" type="text" placeholder="D:\PIONEER\Master\master.db" />
+          </label>
+          <label class="field">
+            <span>Backup folder <em>(blank = next to master.db)</em></span>
+            <input id="set-backup" type="text" placeholder="rekordbox_backups" />
+          </label>
+          <label class="field">
+            <span>Duplicates folder <em>(blank = &lt;library&gt;\_duplicates)</em></span>
+            <input id="set-dupes" type="text" />
+          </label>
+          <label class="check"><input id="set-alpha" type="checkbox" /> Sort artists alphabetically</label>
+          <label class="check"><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label>
+          <label class="check"><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label>
+          <label class="check"><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label>
+          <label class="field">
+            <span>Worker threads <em>(0 = auto / all cores, 1 = sequential)</em></span>
+            <input id="set-threads" type="number" min="0" step="1" />
+          </label>
+        </div>
         <div class="modal-actions">
           <span class="spacer"></span>
-          <button id="drawer-close" class="primary">Done</button>
+          <button id="drawer-close" class="primary">Save settings</button>
         </div>
       </div>
     </div>

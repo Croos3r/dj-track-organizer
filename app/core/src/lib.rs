@@ -7,6 +7,7 @@
 
 pub mod csvio;
 pub mod dedup;
+pub mod health;
 pub mod normalize;
 pub(crate) mod parallel;
 pub mod retry;

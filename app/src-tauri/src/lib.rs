@@ -113,6 +113,263 @@ struct ScanResult {
     used_tags: bool,
 }
 
+#[derive(Serialize)]
+struct HealthReport {
+    scanned_at: String,
+    folder: String,
+    score: u8,
+    audio_files: usize,
+    rename_issues: usize,
+    manual_review: usize,
+    file_duplicate_groups: usize,
+    file_duplicate_extras: usize,
+    rekordbox: Option<RekordboxHealth>,
+    issues: Vec<HealthIssue>,
+}
+
+#[derive(Serialize)]
+struct RekordboxHealth {
+    db_path: String,
+    exists: bool,
+    running: bool,
+    missing_files: usize,
+    missing_file_samples: Vec<String>,
+    collection_duplicate_groups: usize,
+    collection_duplicate_extras: usize,
+    inspection_error: Option<String>,
+}
+
+#[derive(Serialize)]
+struct HealthIssue {
+    id: String,
+    severity: String,
+    title: String,
+    count: usize,
+    description: String,
+}
+
+fn health_issue(
+    id: &str,
+    severity: &str,
+    title: impl Into<String>,
+    count: usize,
+    description: impl Into<String>,
+) -> HealthIssue {
+    HealthIssue {
+        id: id.to_string(),
+        severity: severity.to_string(),
+        title: title.into(),
+        count,
+        description: description.into(),
+    }
+}
+
+#[tauri::command]
+async fn health_scan(folder: String, settings: Settings) -> Result<HealthReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = PathBuf::from(&folder);
+        let opts = norm_options(&settings);
+        let use_tags = settings.prefer_tags;
+        let tags: std::collections::HashMap<String, (String, String)> = if use_tags {
+            let paths = dedup::collect_audio_paths(&dir, false).map_err(|e| e.to_string())?;
+            dedup::read_tags_by_name(&paths, settings.max_threads)
+        } else {
+            std::collections::HashMap::new()
+        };
+        let rows = normalize::build_plan(&dir, move |name| tags.get(name).cloned(), &opts)
+            .map_err(|e| e.to_string())?;
+        let audio_files = rows.len();
+        let rename_issues = rows.iter().filter(|r| !r.new.is_empty() && r.new != r.old).count();
+        let manual_review = rows.iter().filter(|r| r.new.is_empty()).count();
+
+        // This is the same scan used by the existing duplicate workflow, but
+        // deliberately omits its report writer so a health scan stays read-only.
+        let infos = dedup::scan_with(&dir, false, settings.max_threads, |path| {
+            if use_tags {
+                tagging::read_tags(path).map(|(artist, title)| (artist, title, None))
+            } else {
+                None
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        let file_groups = dedup::find_duplicates_with(
+            &infos,
+            dedup::Mode::Both,
+            dedup::HashStrategy { parallelism: settings.max_threads, ..Default::default() },
+        )
+        .map_err(|e| e.to_string())?;
+        let file_duplicate_groups = file_groups.len();
+        let file_duplicate_extras = file_groups.iter().map(|g| g.extras.len()).sum();
+
+        let running = rekordbox::is_rekordbox_running();
+        let db_path = settings
+            .master_db
+            .as_ref()
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+            .or_else(rekordbox::locate_db_path);
+        let db_display_path = db_path
+            .as_ref()
+            .map(|path| path.to_string_lossy().into_owned())
+            .or_else(|| settings.master_db.clone())
+            .unwrap_or_default();
+        let db_exists = db_path.is_some();
+        let mut rekordbox = RekordboxHealth {
+            db_path: db_display_path,
+            exists: db_exists,
+            running,
+            missing_files: 0,
+            missing_file_samples: Vec::new(),
+            collection_duplicate_groups: 0,
+            collection_duplicate_extras: 0,
+            inspection_error: None,
+        };
+
+        if db_exists && !running {
+            let db_file = db_path.as_ref().expect("db_exists implies a path");
+            match rekordbox::open_db(Some(db_file)) {
+                Ok(mut db) => {
+                    let folder_name = Path::new(&folder)
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned());
+                    match rekordbox::load_rb_entries(&mut db, folder_name.as_deref()) {
+                        Ok(entries) => {
+                            let (missing, samples) =
+                                organizer_core::health::missing_rekordbox_files(&entries, 5);
+                            let collection_groups = rekordbox::find_rb_dup_groups(&entries);
+                            rekordbox.missing_files = missing;
+                            rekordbox.missing_file_samples = samples;
+                            rekordbox.collection_duplicate_groups = collection_groups.len();
+                            rekordbox.collection_duplicate_extras = collection_groups
+                                .iter()
+                                .map(|group| group.extras.len())
+                                .sum();
+                        }
+                        Err(error) => rekordbox.inspection_error = Some(error.to_string()),
+                    }
+                }
+                Err(error) => rekordbox.inspection_error = Some(error.to_string()),
+            }
+        }
+
+        let database_unavailable = settings.master_db.is_some() && !db_exists;
+        let score = organizer_core::health::score(
+            rename_issues,
+            file_duplicate_extras,
+            rekordbox.missing_files,
+            database_unavailable,
+            rekordbox.collection_duplicate_groups,
+        );
+        let mut issues = Vec::new();
+        if rename_issues > 0 {
+            issues.push(health_issue(
+                "rename-issues",
+                "warning",
+                "Files need renaming",
+                rename_issues,
+                "The existing Organize flow can review these filename changes before applying them.",
+            ));
+        }
+        if manual_review > 0 {
+            issues.push(health_issue(
+                "manual-review",
+                "warning",
+                "Files need manual naming",
+                manual_review,
+                "The normalizer could not confidently derive both an artist and a title.",
+            ));
+        }
+        if file_duplicate_groups > 0 {
+            issues.push(health_issue(
+                "file-duplicates",
+                "warning",
+                "Duplicate files found",
+                file_duplicate_extras,
+                format!(
+                    "{} duplicate group{} found. Review the existing duplicate workflow before moving anything.",
+                    file_duplicate_groups,
+                    if file_duplicate_groups == 1 { "" } else { "s" }
+                ),
+            ));
+        }
+        if rekordbox.missing_files > 0 {
+            issues.push(health_issue(
+                "missing-rekordbox-files",
+                "critical",
+                "Rekordbox files missing from disk",
+                rekordbox.missing_files,
+                "Some collection entries point to files that are no longer present. A repair workflow is not available yet.",
+            ));
+        }
+        if rekordbox.collection_duplicate_groups > 0 {
+            issues.push(health_issue(
+                "collection-duplicates",
+                "warning",
+                "Duplicate Rekordbox entries found",
+                rekordbox.collection_duplicate_extras,
+                "Review the existing collection cleanup workflow before changing master.db.",
+            ));
+        }
+        if !rekordbox.exists {
+            issues.push(health_issue(
+                "rekordbox-unavailable",
+                "warning",
+                if settings.master_db.is_some() {
+                    "Configured Rekordbox database unavailable"
+                } else {
+                    "Rekordbox database not configured"
+                },
+                1,
+                if settings.master_db.is_some() {
+                    "The configured master.db was not found. Folder health was still scanned."
+                } else {
+                    "Set a master.db path in Settings to include collection checks."
+                },
+            ));
+        } else if rekordbox.running {
+            issues.push(health_issue(
+                "rekordbox-running",
+                "info",
+                "Rekordbox is running",
+                1,
+                "Collection checks were skipped to avoid inspecting master.db while Rekordbox is open.",
+            ));
+        } else if let Some(error) = &rekordbox.inspection_error {
+            issues.push(health_issue(
+                "rekordbox-inspection",
+                "warning",
+                "Rekordbox database could not be inspected",
+                1,
+                format!("Folder health was still scanned. Database error: {error}"),
+            ));
+        }
+        if issues.is_empty() {
+            issues.push(health_issue(
+                "library-healthy",
+                "info",
+                "No issues found",
+                0,
+                "The selected library passed the available read-only checks.",
+            ));
+        }
+
+        Ok(HealthReport {
+            scanned_at: chrono::Local::now().to_rfc3339(),
+            folder,
+            score,
+            audio_files,
+            rename_issues,
+            manual_review,
+            file_duplicate_groups,
+            file_duplicate_extras,
+            rekordbox: Some(rekordbox),
+            issues,
+        })
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 fn norm_options(s: &Settings) -> normalize::Options {
     normalize::Options {
         source: if s.prefer_tags {
@@ -530,6 +787,7 @@ pub fn run() {
             save_settings,
             pick_folder,
             reveal_path,
+            health_scan,
             scan_plan,
             apply_renames,
             tag_folder,
