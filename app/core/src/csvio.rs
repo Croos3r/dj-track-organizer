@@ -88,6 +88,17 @@ pub fn load_mapping(path: &Path) -> std::io::Result<Vec<(String, String)>> {
 mod tests {
     use super::*;
 
+    fn with_crlf_line_endings(bytes: &[u8]) -> Vec<u8> {
+        let mut normalized = Vec::with_capacity(bytes.len());
+        for &byte in bytes {
+            if byte == b'\n' && normalized.last() != Some(&b'\r') {
+                normalized.push(b'\r');
+            }
+            normalized.push(byte);
+        }
+        normalized
+    }
+
     fn plan_rows() -> Vec<PlanRow> {
         [
             (
@@ -122,7 +133,8 @@ mod tests {
         let p = td.path().join("plan.csv");
         write_plan_csv(&p, &plan_rows()).unwrap();
         let got = std::fs::read(&p).unwrap();
-        let want = include_bytes!("../tests/fixtures/csv_plan_expected.csv");
+        let want =
+            with_crlf_line_endings(include_bytes!("../tests/fixtures/csv_plan_expected.csv"));
         assert_eq!(got, want, "plan CSV bytes differ from Python oracle");
     }
 
@@ -133,7 +145,9 @@ mod tests {
         let done: Vec<(String, String)> = plan_rows().into_iter().map(|r| (r.old, r.new)).collect();
         write_rollback_csv(&p, &done).unwrap();
         let got = std::fs::read(&p).unwrap();
-        let want = include_bytes!("../tests/fixtures/csv_rollback_expected.csv");
+        let want = with_crlf_line_endings(include_bytes!(
+            "../tests/fixtures/csv_rollback_expected.csv"
+        ));
         assert_eq!(got, want, "rollback CSV bytes differ from Python oracle");
     }
 

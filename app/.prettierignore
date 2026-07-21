@@ -3,3 +3,4 @@ target-health
 src-tauri/gen
 node_modules
 *.lock
+core/tests/fixtures/*.csv
