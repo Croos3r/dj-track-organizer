@@ -64,7 +64,13 @@ fn seed_db(db_path: &Path) {
     seeds += &content_insert("C5", "D:/Music/Track/Gamma - Three.flac", DATE_OLD, 0, 0);
     seeds += &content_insert("C6", "spotify:track:xyz", DATE_OLD, 0, 0);
     // cues: C1 two, C2 one, C4 two
-    for (cid, content) in [("Q1", "C1"), ("Q2", "C1"), ("Q3", "C2"), ("Q4", "C4"), ("Q5", "C4")] {
+    for (cid, content) in [
+        ("Q1", "C1"),
+        ("Q2", "C1"),
+        ("Q3", "C2"),
+        ("Q4", "C4"),
+        ("Q5", "C4"),
+    ] {
         seeds += &format!(
             "INSERT INTO djmdCue (ID, UUID, ContentID, created_at, updated_at, \
              rb_data_status, rb_local_data_status, rb_local_deleted, rb_local_synced, \
@@ -75,9 +81,12 @@ fn seed_db(db_path: &Path) {
         );
     }
     // playlists: C1 in P1; C2 in P1 (duplicate membership) and P2; C3 in P2
-    for (rid, content, playlist) in
-        [("S1", "C1", "P1"), ("S2", "C2", "P1"), ("S3", "C2", "P2"), ("S4", "C3", "P2")]
-    {
+    for (rid, content, playlist) in [
+        ("S1", "C1", "P1"),
+        ("S2", "C2", "P1"),
+        ("S3", "C2", "P2"),
+        ("S4", "C3", "P2"),
+    ] {
         seeds += &format!(
             "INSERT INTO djmdSongPlaylist (ID, UUID, PlaylistID, ContentID, TrackNo, created_at, \
              updated_at, rb_data_status, rb_local_data_status, rb_local_deleted, rb_local_synced) \
@@ -89,7 +98,13 @@ fn seed_db(db_path: &Path) {
 }
 
 /// Everything semantically relevant, ordered: contents, cue links, playlist links.
-fn dump_state(db_path: &Path) -> (BTreeMap<String, String>, BTreeMap<String, String>, BTreeMap<String, (String, String)>) {
+fn dump_state(
+    db_path: &Path,
+) -> (
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+    BTreeMap<String, (String, String)>,
+) {
     #[derive(QueryableByName)]
     struct Row3 {
         #[diesel(sql_type = diesel::sql_types::Text)]
@@ -123,7 +138,12 @@ fn dump_state(db_path: &Path) -> (BTreeMap<String, String>, BTreeMap<String, Str
 }
 
 fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap().to_path_buf()
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf()
 }
 
 #[test]
@@ -141,9 +161,15 @@ fn collection_dedup_matches_python_oracle() {
     let groups = find_rb_dup_groups(&entries);
     assert_eq!(groups.len(), 2);
     assert_eq!(groups[0].kind, "same-file");
-    assert_eq!(groups[0].keeper.id, "C2", "more user data wins the same-file tie");
+    assert_eq!(
+        groups[0].keeper.id, "C2",
+        "more user data wins the same-file tie"
+    );
     assert_eq!(groups[1].kind, "same-song");
-    assert_eq!(groups[1].keeper.id, "C3", "lossless wins the same-song group");
+    assert_eq!(
+        groups[1].keeper.id, "C3",
+        "lossless wins the same-song group"
+    );
 
     let report = td.path().join("rekordbox_duplicates.csv");
     let extras = write_rb_dedup_report(&report, &groups).unwrap();
@@ -211,14 +237,25 @@ fn collection_dedup_matches_python_oracle() {
             (
                 s["kind"].as_str().unwrap().to_string(),
                 s["keeper"].as_str().unwrap().to_string(),
-                s["extras"].as_array().unwrap().iter().map(|x| x.as_str().unwrap().to_string()).collect(),
+                s["extras"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|x| x.as_str().unwrap().to_string())
+                    .collect(),
             )
         })
         .collect();
-    assert_eq!(rust_summary, py_summary, "group/keeper choices differ from the Python oracle");
+    assert_eq!(
+        rust_summary, py_summary,
+        "group/keeper choices differ from the Python oracle"
+    );
 
     // ---- final database states must match ------------------------------- //
     let py_state = dump_state(&py_db);
     let rust_state = dump_state(&rust_db);
-    assert_eq!(rust_state, py_state, "post-apply database state differs from the Python oracle");
+    assert_eq!(
+        rust_state, py_state,
+        "post-apply database state differs from the Python oracle"
+    );
 }

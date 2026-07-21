@@ -1,124 +1,52 @@
 [
- {
-  "name": "exact_dupes",
-  "recursive": false,
-  "files": [
-   [
-    "Alpha - One.wav",
-    "A",
-    400
-   ],
-   [
-    "Alpha - One (2).wav",
-    "A",
-    400
-   ],
-   [
-    "Beta - Two.wav",
-    "B",
-    400
-   ],
-   [
-    "Gamma - Three.mp3",
-    "C",
-    100
-   ]
-  ],
-  "stdout": "tag source     : filenames only\nfiles scanned  : 4\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
-  "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/Alpha - One (2).wav,Alpha,One (2),.wav,400\r\n1,exact,duplicate,<ROOT>/Alpha - One.wav,Alpha,One,.wav,400\r\n"
- },
- {
-  "name": "same_song_formats",
-  "recursive": false,
-  "files": [
-   [
-    "Artist - Song.wav",
-    "W",
-    900
-   ],
-   [
-    "Artist - Song.mp3",
-    "M",
-    300
-   ],
-   [
-    "Àrtist - Söng!.flac",
-    "F",
-    500
-   ],
-   [
-    "Artist - Song (Original Mix).mp3",
-    "O",
-    300
-   ],
-   [
-    "Artist - Song (Extended Mix).mp3",
-    "E",
-    300
-   ]
-  ],
-  "stdout": "tag source     : filenames only\nfiles scanned  : 5\nduplicate sets : 1\nextra copies   : 2\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
-  "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,same-song,keep,<ROOT>/Artist - Song.wav,Artist,Song,.wav,900\r\n1,same-song,duplicate,<ROOT>/Àrtist - Söng!.flac,Àrtist,Söng!,.flac,500\r\n1,same-song,duplicate,<ROOT>/Artist - Song.mp3,Artist,Song,.mp3,300\r\n"
- },
- {
-  "name": "keeper_by_size",
-  "recursive": false,
-  "files": [
-   [
-    "X - Y.mp3",
-    "S",
-    100
-   ],
-   [
-    "X - Y (rip).mp3",
-    "L",
-    5000
-   ],
-   [
-    "Z - Q.mp3",
-    "1",
-    100
-   ],
-   [
-    "Z - Q (2).mp3",
-    "2",
-    100
-   ],
-   [
-    "Q - Same.mp3",
-    "s",
-    200
-   ],
-   [
-    "Q - Same (3).mp3",
-    "s",
-    200
-   ]
-  ],
-  "stdout": "tag source     : filenames only\nfiles scanned  : 6\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
-  "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/Q - Same (3).mp3,Q,Same (3),.mp3,200\r\n1,exact,duplicate,<ROOT>/Q - Same.mp3,Q,Same,.mp3,200\r\n"
- },
- {
-  "name": "recursive_overlap",
-  "recursive": true,
-  "files": [
-   [
-    "X - Y.wav",
-    "R",
-    600
-   ],
-   [
-    "sub/X - Y.wav",
-    "R",
-    600
-   ],
-   [
-    "sub/deeper/Other - Track.mp3",
-    "T",
-    150
-   ]
-  ],
-  "stdout": "tag source     : filenames only\nfiles scanned  : 3\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
-  "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/X - Y.wav,X,Y,.wav,600\r\n1,exact,duplicate,<ROOT>/sub/X - Y.wav,X,Y,.wav,600\r\n"
- }
+  {
+    "name": "exact_dupes",
+    "recursive": false,
+    "files": [
+      ["Alpha - One.wav", "A", 400],
+      ["Alpha - One (2).wav", "A", 400],
+      ["Beta - Two.wav", "B", 400],
+      ["Gamma - Three.mp3", "C", 100]
+    ],
+    "stdout": "tag source     : filenames only\nfiles scanned  : 4\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
+    "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/Alpha - One (2).wav,Alpha,One (2),.wav,400\r\n1,exact,duplicate,<ROOT>/Alpha - One.wav,Alpha,One,.wav,400\r\n"
+  },
+  {
+    "name": "same_song_formats",
+    "recursive": false,
+    "files": [
+      ["Artist - Song.wav", "W", 900],
+      ["Artist - Song.mp3", "M", 300],
+      ["Àrtist - Söng!.flac", "F", 500],
+      ["Artist - Song (Original Mix).mp3", "O", 300],
+      ["Artist - Song (Extended Mix).mp3", "E", 300]
+    ],
+    "stdout": "tag source     : filenames only\nfiles scanned  : 5\nduplicate sets : 1\nextra copies   : 2\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
+    "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,same-song,keep,<ROOT>/Artist - Song.wav,Artist,Song,.wav,900\r\n1,same-song,duplicate,<ROOT>/Àrtist - Söng!.flac,Àrtist,Söng!,.flac,500\r\n1,same-song,duplicate,<ROOT>/Artist - Song.mp3,Artist,Song,.mp3,300\r\n"
+  },
+  {
+    "name": "keeper_by_size",
+    "recursive": false,
+    "files": [
+      ["X - Y.mp3", "S", 100],
+      ["X - Y (rip).mp3", "L", 5000],
+      ["Z - Q.mp3", "1", 100],
+      ["Z - Q (2).mp3", "2", 100],
+      ["Q - Same.mp3", "s", 200],
+      ["Q - Same (3).mp3", "s", 200]
+    ],
+    "stdout": "tag source     : filenames only\nfiles scanned  : 6\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
+    "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/Q - Same (3).mp3,Q,Same (3),.mp3,200\r\n1,exact,duplicate,<ROOT>/Q - Same.mp3,Q,Same,.mp3,200\r\n"
+  },
+  {
+    "name": "recursive_overlap",
+    "recursive": true,
+    "files": [
+      ["X - Y.wav", "R", 600],
+      ["sub/X - Y.wav", "R", 600],
+      ["sub/deeper/Other - Track.mp3", "T", 150]
+    ],
+    "stdout": "tag source     : filenames only\nfiles scanned  : 3\nduplicate sets : 1\nextra copies   : 1\nreport         : <ROOT>/duplicates.csv\n\nReport only. Use --move DEST to relocate the extra copies, or --delete to remove them.\n",
+    "report": "group,kind,role,file,artist,title,ext,size_bytes\r\n1,exact,keep,<ROOT>/X - Y.wav,X,Y,.wav,600\r\n1,exact,duplicate,<ROOT>/sub/X - Y.wav,X,Y,.wav,600\r\n"
+  }
 ]

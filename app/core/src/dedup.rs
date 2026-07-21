@@ -13,8 +13,9 @@ use sha1::{Digest, Sha1};
 use unicode_normalization::UnicodeNormalization;
 use unicode_properties::{GeneralCategory, UnicodeGeneralCategory};
 
-pub const AUDIO_EXT: [&str; 8] =
-    [".mp3", ".wav", ".aiff", ".aif", ".aifc", ".flac", ".m4a", ".ogg"];
+pub const AUDIO_EXT: [&str; 8] = [
+    ".mp3", ".wav", ".aiff", ".aif", ".aifc", ".flac", ".m4a", ".ogg",
+];
 
 pub(crate) fn quality_rank(ext: &str) -> i32 {
     match ext {
@@ -110,14 +111,22 @@ pub struct HashStrategy {
 impl Default for HashStrategy {
     /// Production default: fast hash, prefix-gated, all cores.
     fn default() -> Self {
-        HashStrategy { algo: HashAlgo::Blake3, prefix_gate: true, parallelism: 0 }
+        HashStrategy {
+            algo: HashAlgo::Blake3,
+            prefix_gate: true,
+            parallelism: 0,
+        }
     }
 }
 
 impl HashStrategy {
     /// The old behavior, kept as the benchmark baseline.
     pub fn baseline() -> Self {
-        HashStrategy { algo: HashAlgo::Sha1, prefix_gate: false, parallelism: 1 }
+        HashStrategy {
+            algo: HashAlgo::Sha1,
+            prefix_gate: false,
+            parallelism: 1,
+        }
     }
 }
 
@@ -165,7 +174,10 @@ fn hash_full(path: &Path, algo: HashAlgo) -> std::io::Result<String> {
 /// Hash of at most the first `PREFIX_LEN` bytes (prefixed with a tag so a
 /// prefix hash can never collide with a full hash).
 fn hash_prefix(path: &Path, algo: HashAlgo) -> std::io::Result<String> {
-    Ok(format!("p:{}", hash_reader(std::fs::File::open(path)?, algo, Some(PREFIX_LEN))?))
+    Ok(format!(
+        "p:{}",
+        hash_reader(std::fs::File::open(path)?, algo, Some(PREFIX_LEN))?
+    ))
 }
 
 fn ext_of(path: &Path) -> String {
@@ -176,7 +188,11 @@ fn ext_of(path: &Path) -> String {
 
 /// Python `keeper_score`: higher is better (lossless, then longer, then larger).
 fn keeper_score(info: &FileInfo) -> (i32, f64, u64) {
-    (quality_rank(&ext_of(&info.path)), info.dur.unwrap_or(0.0), info.size)
+    (
+        quality_rank(&ext_of(&info.path)),
+        info.dur.unwrap_or(0.0),
+        info.size,
+    )
 }
 
 fn has_audio_ext(name: &str) -> bool {
@@ -208,7 +224,9 @@ pub fn collect_audio_paths(folder: &Path, recursive: bool) -> std::io::Result<Ve
     while let Some(dir) = stack.pop() {
         let (files, dirs) = sorted_entries(&dir)?;
         paths.extend(files.into_iter().filter(|p| {
-            p.file_name().map(|n| has_audio_ext(&n.to_string_lossy())).unwrap_or(false)
+            p.file_name()
+                .map(|n| has_audio_ext(&n.to_string_lossy()))
+                .unwrap_or(false)
         }));
         if recursive {
             for d in dirs.into_iter().rev() {
@@ -224,7 +242,8 @@ pub fn collect_audio_paths(folder: &Path, recursive: bool) -> std::io::Result<Ve
 fn file_info(p: &Path, tags: Option<(String, String, Option<f64>)>) -> std::io::Result<FileInfo> {
     let (mut artist, mut title, dur) = tags.unwrap_or((String::new(), String::new(), None));
     if artist.is_empty() || title.is_empty() {
-        let (fa, ft) = crate::tagging::parse_name(&p.file_name().unwrap_or_default().to_string_lossy());
+        let (fa, ft) =
+            crate::tagging::parse_name(&p.file_name().unwrap_or_default().to_string_lossy());
         if artist.is_empty() {
             artist = fa;
         }
@@ -233,7 +252,13 @@ fn file_info(p: &Path, tags: Option<(String, String, Option<f64>)>) -> std::io::
         }
     }
     let size = std::fs::metadata(p)?.len();
-    Ok(FileInfo { path: p.to_path_buf(), artist, title, dur, size })
+    Ok(FileInfo {
+        path: p.to_path_buf(),
+        artist,
+        title,
+        dur,
+        size,
+    })
 }
 
 /// Sequential scan (used by tests and callers that pass a stateful closure).
@@ -259,7 +284,10 @@ pub fn scan_with(
         return paths.iter().map(|p| file_info(p, read_tags(p))).collect();
     }
     run_in_pool(parallelism, || {
-        paths.par_iter().map(|p| file_info(p, read_tags(p))).collect()
+        paths
+            .par_iter()
+            .map(|p| file_info(p, read_tags(p)))
+            .collect()
     })
 }
 
@@ -296,7 +324,10 @@ fn group_by<K: std::hash::Hash + Eq + Clone>(
         }
         map.entry(k).or_default().push(it.clone());
     }
-    order.into_iter().map(|k| (k.clone(), map.remove(&k).unwrap())).collect()
+    order
+        .into_iter()
+        .map(|k| (k.clone(), map.remove(&k).unwrap()))
+        .collect()
 }
 
 use crate::parallel::run_in_pool;
@@ -312,7 +343,9 @@ fn hashes_in_order(
     if parallelism == 1 {
         items.iter().map(|it| hash(&it.path)).collect()
     } else {
-        run_in_pool(parallelism, || items.par_iter().map(|it| hash(&it.path)).collect())
+        run_in_pool(parallelism, || {
+            items.par_iter().map(|it| hash(&it.path)).collect()
+        })
     }
 }
 
@@ -375,8 +408,11 @@ pub fn find_exact_with(
 }
 
 fn find_same_song(infos: &[FileInfo]) -> Vec<Vec<FileInfo>> {
-    let with_title: Vec<FileInfo> =
-        infos.iter().filter(|i| !i.title.is_empty()).cloned().collect();
+    let with_title: Vec<FileInfo> = infos
+        .iter()
+        .filter(|i| !i.title.is_empty())
+        .cloned()
+        .collect();
     group_by(&with_title, |i| norm_key(&i.artist, &i.title))
         .into_iter()
         .filter_map(|(_, items)| (items.len() > 1).then_some(items))
@@ -415,15 +451,21 @@ pub fn find_duplicates_with(
     let mut add = |found: Vec<Vec<FileInfo>>, kind: DupKind, groups: &mut Vec<DupGroup>| {
         for g in found {
             let (keeper, extras) = choose(g);
-            let fresh: Vec<FileInfo> =
-                extras.into_iter().filter(|e| !seen.contains(&e.path)).collect();
+            let fresh: Vec<FileInfo> = extras
+                .into_iter()
+                .filter(|e| !seen.contains(&e.path))
+                .collect();
             if fresh.is_empty() {
                 continue;
             }
             for e in &fresh {
                 seen.insert(e.path.clone());
             }
-            groups.push(DupGroup { kind, keeper, extras: fresh });
+            groups.push(DupGroup {
+                kind,
+                keeper,
+                extras: fresh,
+            });
         }
     };
     if matches!(mode, Mode::Exact | Mode::Both) {
@@ -444,7 +486,16 @@ pub fn write_report(path: &Path, groups: &[DupGroup]) -> std::io::Result<usize> 
         .terminator(csv::Terminator::CRLF)
         .quote_style(csv::QuoteStyle::Necessary)
         .from_writer(file);
-    w.write_record(["group", "kind", "role", "file", "artist", "title", "ext", "size_bytes"])?;
+    w.write_record([
+        "group",
+        "kind",
+        "role",
+        "file",
+        "artist",
+        "title",
+        "ext",
+        "size_bytes",
+    ])?;
     let mut extras = 0usize;
     for (gid, g) in groups.iter().enumerate() {
         let mut rows: Vec<(&str, &FileInfo)> = vec![("keep", &g.keeper)];
@@ -476,7 +527,12 @@ pub fn move_extras(groups: &[DupGroup], dest: &Path) -> std::io::Result<Vec<(Pat
     let mut moved = Vec::new();
     for g in groups {
         for e in &g.extras {
-            let base = e.path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+            let base = e
+                .path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned();
             let mut target = dest.join(&base);
             let mut n = 2;
             while target.exists() {
@@ -528,7 +584,10 @@ mod tests {
         let groups = vec![DupGroup {
             kind: DupKind::SameSong,
             keeper: mk(src.join("keeper.wav"), 9),
-            extras: vec![mk(src.join("A - B.mp3"), 3), mk(src.join("sub/A - B.mp3"), 3)],
+            extras: vec![
+                mk(src.join("A - B.mp3"), 3),
+                mk(src.join("sub/A - B.mp3"), 3),
+            ],
         }];
         let moved = move_extras(&groups, &dest).unwrap();
         assert_eq!(moved.len(), 2);
@@ -567,13 +626,27 @@ mod tests {
         let infos = scan(dir, false, |_| None).unwrap();
         let strategies = [
             HashStrategy::baseline(),
-            HashStrategy { algo: HashAlgo::Sha1, prefix_gate: false, parallelism: 4 },
-            HashStrategy { algo: HashAlgo::Blake3, prefix_gate: true, parallelism: 1 },
-            HashStrategy { algo: HashAlgo::Blake3, prefix_gate: true, parallelism: 4 },
+            HashStrategy {
+                algo: HashAlgo::Sha1,
+                prefix_gate: false,
+                parallelism: 4,
+            },
+            HashStrategy {
+                algo: HashAlgo::Blake3,
+                prefix_gate: true,
+                parallelism: 1,
+            },
+            HashStrategy {
+                algo: HashAlgo::Blake3,
+                prefix_gate: true,
+                parallelism: 4,
+            },
             HashStrategy::default(),
         ];
         let as_paths = |gs: &[Vec<FileInfo>]| -> Vec<Vec<PathBuf>> {
-            gs.iter().map(|g| g.iter().map(|f| f.path.clone()).collect()).collect()
+            gs.iter()
+                .map(|g| g.iter().map(|f| f.path.clone()).collect())
+                .collect()
         };
         let baseline = as_paths(&find_exact_with(&infos, strategies[0]).unwrap());
         // exactly the one true exact-duplicate pair

@@ -30,7 +30,12 @@ fn cases() -> Vec<Case> {
 fn parse_name_matches_python_oracle() {
     for c in cases() {
         let (a, t) = parse_name(&c.file);
-        assert_eq!((a, t), (c.artist.clone(), c.title.clone()), "case {}", c.name);
+        assert_eq!(
+            (a, t),
+            (c.artist.clone(), c.title.clone()),
+            "case {}",
+            c.name
+        );
     }
 }
 
@@ -46,9 +51,12 @@ fn count_info_chunks(bytes: &[u8]) -> usize {
     let mut pos = 12;
     while pos + 8 <= bytes.len() {
         let id = &bytes[pos..pos + 4];
-        let size =
-            u32::from_le_bytes([bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]])
-                as usize;
+        let size = u32::from_le_bytes([
+            bytes[pos + 4],
+            bytes[pos + 5],
+            bytes[pos + 6],
+            bytes[pos + 7],
+        ]) as usize;
         if id == b"LIST" && bytes.len() >= pos + 12 && &bytes[pos + 8..pos + 12] == b"INFO" {
             n += 1;
         }
@@ -78,8 +86,18 @@ fn tagged_bytes_match_python_oracle() {
         let got = std::fs::read(&path).unwrap();
         if DEVIATIONS.contains(&c.name.as_str()) {
             // documented deviation: assert semantics instead of bytes
-            assert_eq!(count_info_chunks(&got), 1, "{}: exactly one INFO chunk", c.name);
-            assert_eq!(count_info_chunks(&expected), 2, "{}: oracle wrote two INFOs", c.name);
+            assert_eq!(
+                count_info_chunks(&got),
+                1,
+                "{}: exactly one INFO chunk",
+                c.name
+            );
+            assert_eq!(
+                count_info_chunks(&expected),
+                2,
+                "{}: oracle wrote two INFOs",
+                c.name
+            );
             // audio and non-metadata chunks survive
             assert!(
                 got.windows(32).any(|w| w == [0xCC; 32]),
@@ -101,7 +119,11 @@ fn tagged_bytes_match_python_oracle() {
             got.len(),
             expected.len()
         );
-        assert!(got == expected, "{}: output bytes differ from oracle", c.name);
+        assert!(
+            got == expected,
+            "{}: output bytes differ from oracle",
+            c.name
+        );
         assert_eq!(got != input, c.changed, "{}: changed flag mismatch", c.name);
     }
 }

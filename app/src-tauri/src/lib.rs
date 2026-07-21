@@ -66,8 +66,7 @@ fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&p, serde_json::to_string_pretty(&settings).unwrap())
-        .map_err(|e| e.to_string())
+    std::fs::write(&p, serde_json::to_string_pretty(&settings).unwrap()).map_err(|e| e.to_string())
 }
 
 // --------------------------------------------------------------------------- #
@@ -397,17 +396,19 @@ async fn scan_plan(folder: String, settings: Settings) -> Result<ScanResult, Str
         } else {
             std::collections::HashMap::new()
         };
-        let rows = normalize::build_plan(
-            &dir,
-            move |name| tags.get(name).cloned(),
-            &opts,
-        )
-        .map_err(|e| e.to_string())?;
+        let rows = normalize::build_plan(&dir, move |name| tags.get(name).cloned(), &opts)
+            .map_err(|e| e.to_string())?;
         let total = rows.len();
-        let to_rename = rows.iter().filter(|r| !r.new.is_empty() && r.new != r.old).count();
+        let to_rename = rows
+            .iter()
+            .filter(|r| !r.new.is_empty() && r.new != r.old)
+            .count();
         let already = rows.iter().filter(|r| r.new == r.old).count();
-        let manual: Vec<String> =
-            rows.iter().filter(|r| r.new.is_empty()).map(|r| r.old.clone()).collect();
+        let manual: Vec<String> = rows
+            .iter()
+            .filter(|r| r.new.is_empty())
+            .map(|r| r.old.clone())
+            .collect();
         Ok(ScanResult {
             rows,
             total,
@@ -476,7 +477,11 @@ struct TagResult {
 }
 
 #[tauri::command]
-async fn tag_folder(app: AppHandle, folder: String, settings: Settings) -> Result<TagResult, String> {
+async fn tag_folder(
+    app: AppHandle,
+    folder: String,
+    settings: Settings,
+) -> Result<TagResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use std::sync::atomic::{AtomicUsize, Ordering};
         let dir = PathBuf::from(&folder);
@@ -486,7 +491,11 @@ async fn tag_folder(app: AppHandle, folder: String, settings: Settings) -> Resul
             .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
             .map(|e| e.path())
             .filter(|p| {
-                let lower = p.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                let lower = p
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase();
                 tagging::SUPPORTED.iter().any(|ext| lower.ends_with(ext))
             })
             .collect();
@@ -499,7 +508,14 @@ async fn tag_folder(app: AppHandle, folder: String, settings: Settings) -> Resul
         let results = tagging::tag_files(&files, settings.max_threads, || {
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
             if n % 16 == 0 || n == total {
-                let _ = app.emit("tag-progress", TagProgress { done: n, total, file: String::new() });
+                let _ = app.emit(
+                    "tag-progress",
+                    TagProgress {
+                        done: n,
+                        total,
+                        file: String::new(),
+                    },
+                );
             }
         });
 
@@ -511,12 +527,19 @@ async fn tag_folder(app: AppHandle, folder: String, settings: Settings) -> Resul
                 Ok(tagging::TagStatus::Ok) => tagged += 1,
                 Ok(_) => skipped += 1,
                 Err(e) => errors.push((
-                    path.file_name().unwrap_or_default().to_string_lossy().into_owned(),
+                    path.file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned(),
                     e.to_string(),
                 )),
             }
         }
-        Ok(TagResult { tagged, skipped, errors })
+        Ok(TagResult {
+            tagged,
+            skipped,
+            errors,
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -546,7 +569,10 @@ async fn rekordbox_status(settings: Settings) -> RekordboxStatus {
         }
     })
     .await
-    .unwrap_or(RekordboxStatus { running: true, db_path: None })
+    .unwrap_or(RekordboxStatus {
+        running: true,
+        db_path: None,
+    })
 }
 
 fn resolve_db(settings: &Settings) -> Result<PathBuf, String> {
@@ -596,19 +622,19 @@ async fn rekordbox_apply(
             .as_ref()
             .map(PathBuf::from)
             .unwrap_or_else(|| db_path.parent().unwrap().join("rekordbox_backups"));
-        let backup =
-            rekordbox::backup_db(&db_path, &backup_dir).map_err(|e| {
-                format!("backup failed ({e}); nothing was written")
-            })?;
+        let backup = rekordbox::backup_db(&db_path, &backup_dir)
+            .map_err(|e| format!("backup failed ({e}); nothing was written"))?;
         let mut db = rekordbox::open_db(Some(&db_path)).map_err(|e| e.to_string())?;
         let opts = rekordbox::ApplyOptions {
             set_title: settings.set_title,
             refresh_artist: settings.refresh_artist,
             allow_while_running: false,
         };
-        let changed =
-            rekordbox::apply_relink(&mut db, &plan, opts).map_err(|e| e.to_string())?;
-        Ok(RelinkResult { changed, backup_path: backup.to_string_lossy().into_owned() })
+        let changed = rekordbox::apply_relink(&mut db, &plan, opts).map_err(|e| e.to_string())?;
+        Ok(RelinkResult {
+            changed,
+            backup_path: backup.to_string_lossy().into_owned(),
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -679,7 +705,10 @@ async fn rekordbox_dedup_apply(
         let mut db = rekordbox::open_db(Some(&db_path)).map_err(|e| e.to_string())?;
         let removed =
             rekordbox::apply_rb_dedup(&mut db, &groups, false).map_err(|e| e.to_string())?;
-        Ok(RbDedupResult { removed, backup_path: backup.to_string_lossy().into_owned() })
+        Ok(RbDedupResult {
+            removed,
+            backup_path: backup.to_string_lossy().into_owned(),
+        })
     })
     .await
     .map_err(|e| e.to_string())?
@@ -714,7 +743,10 @@ async fn dedup_scan(folder: String, settings: Settings) -> Result<DedupScan, Str
         })
         .map_err(|e| e.to_string())?;
         let scanned = infos.len();
-        let strat = dedup::HashStrategy { parallelism: settings.max_threads, ..Default::default() };
+        let strat = dedup::HashStrategy {
+            parallelism: settings.max_threads,
+            ..Default::default()
+        };
         let groups = dedup::find_duplicates_with(&infos, dedup::Mode::Both, strat)
             .map_err(|e| e.to_string())?;
         let report_path = dir.join("duplicates.csv");
@@ -764,7 +796,10 @@ async fn dedup_move(
             })
             .collect();
         if infos.is_empty() {
-            return Ok(MoveResult { moved: 0, dest: dest.to_string_lossy().into_owned() });
+            return Ok(MoveResult {
+                moved: 0,
+                dest: dest.to_string_lossy().into_owned(),
+            });
         }
         let group = dedup::DupGroup {
             kind: dedup::DupKind::SameSong,
@@ -772,7 +807,10 @@ async fn dedup_move(
             extras: infos,
         };
         let moved = dedup::move_extras(&[group], &dest).map_err(|e| e.to_string())?;
-        Ok(MoveResult { moved: moved.len(), dest: dest.to_string_lossy().into_owned() })
+        Ok(MoveResult {
+            moved: moved.len(),
+            dest: dest.to_string_lossy().into_owned(),
+        })
     })
     .await
     .map_err(|e| e.to_string())?

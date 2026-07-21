@@ -18,8 +18,15 @@
           </div>
         </div>
         <div class="topbar-meta">
-          <span class="session-state"><span class="session-dot" aria-hidden="true"></span>Local library</span>
-          <button id="settings-btn" class="ghost settings-trigger" title="Settings" aria-label="Open settings">
+          <span class="session-state"
+            ><span class="session-dot" aria-hidden="true"></span>Local library</span
+          >
+          <button
+            id="settings-btn"
+            class="ghost settings-trigger"
+            title="Settings"
+            aria-label="Open settings"
+          >
             <span class="settings-glyph" aria-hidden="true">+</span>
             <span>Settings</span>
           </button>
@@ -32,7 +39,9 @@
             <p class="eyebrow">PREP DESK</p>
             <h2 id="workspace-title">Make the library ready for the room.</h2>
           </div>
-          <p class="intro-note">A careful pass over names, tags, collection links and duplicates.</p>
+          <p class="intro-note">
+            A careful pass over names, tags, collection links and duplicates.
+          </p>
         </section>
 
         <section class="card folder-card" aria-labelledby="library-heading">
@@ -42,12 +51,20 @@
               <span id="library-heading" class="label">Library folder</span>
             </div>
             <span id="folder-path" class="path">No folder selected</span>
-            <span class="folder-hint">Choose the folder that holds your working audio library.</span>
+            <span class="folder-hint"
+              >Choose the folder that holds your working audio library.</span
+            >
           </div>
-          <button id="browse-btn" class="secondary browse-button">Browse<span aria-hidden="true">&hellip;</span></button>
+          <button id="browse-btn" class="secondary browse-button">
+            Browse<span aria-hidden="true">&hellip;</span>
+          </button>
         </section>
 
-        <section id="health-dashboard" class="card health-dashboard" aria-labelledby="health-heading">
+        <section
+          id="health-dashboard"
+          class="card health-dashboard"
+          aria-labelledby="health-heading"
+        >
           <div class="health-head">
             <div>
               <div class="section-label-row">
@@ -59,7 +76,10 @@
             </div>
             <button id="health-scan-btn" class="secondary" disabled>Check library</button>
           </div>
-          <div class="health-note"><span class="note-mark" aria-hidden="true">i</span>Read-only scan &mdash; no changes will be made</div>
+          <div class="health-note">
+            <span class="note-mark" aria-hidden="true">i</span>Read-only scan &mdash; no changes
+            will be made
+          </div>
           <div id="health-progress" class="health-progress hidden" role="status" aria-live="polite">
             <div class="health-progress-bar" aria-hidden="true"></div>
             <span>Checking filenames, duplicates, and Rekordbox&hellip;</span>
@@ -69,7 +89,10 @@
             <div class="health-score-row">
               <div class="health-score-block">
                 <span class="label">Overall score</span>
-                <div class="score-line"><strong id="health-score">&mdash;</strong><span id="health-score-label" class="health-score-label"></span></div>
+                <div class="score-line">
+                  <strong id="health-score">&mdash;</strong
+                  ><span id="health-score-label" class="health-score-label"></span>
+                </div>
               </div>
               <span id="health-scanned-at" class="label"></span>
             </div>
@@ -119,7 +142,10 @@
                 <span class="chip pending">waiting</span>
               </div>
               <div class="step-detail"></div>
-              <div class="progress hidden" role="progressbar" aria-label="Tagging progress"><div class="bar"></div><span class="progress-text"></span></div>
+              <div class="progress hidden" role="progressbar" aria-label="Tagging progress">
+                <div class="bar"></div>
+                <span class="progress-text"></span>
+              </div>
             </div>
             <div class="step" id="step-rekordbox">
               <div class="step-head">
@@ -156,7 +182,13 @@
     </div>
 
     <div id="modal" class="overlay hidden" role="presentation">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-sub">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        aria-describedby="modal-sub"
+      >
         <div class="dialog-kicker">REVIEW GATE</div>
         <h2 id="modal-title"></h2>
         <p id="modal-sub" class="sub"></p>
@@ -188,10 +220,18 @@
             <span>Duplicates folder <em>(blank = &lt;library&gt;\_duplicates)</em></span>
             <input id="set-dupes" type="text" />
           </label>
-          <label class="check"><input id="set-alpha" type="checkbox" /> Sort artists alphabetically</label>
-          <label class="check"><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label>
-          <label class="check"><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label>
-          <label class="check"><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label>
+          <label class="check"
+            ><input id="set-alpha" type="checkbox" /> Sort artists alphabetically</label
+          >
+          <label class="check"
+            ><input id="set-tags" type="checkbox" /> Prefer embedded tags over filenames</label
+          >
+          <label class="check"
+            ><input id="set-title" type="checkbox" /> Set Title in Rekordbox</label
+          >
+          <label class="check"
+            ><input id="set-artist" type="checkbox" /> Refresh Artist in Rekordbox</label
+          >
           <label class="field">
             <span>Worker threads <em>(0 = auto / all cores, 1 = sequential)</em></span>
             <input id="set-threads" type="number" min="0" step="1" />

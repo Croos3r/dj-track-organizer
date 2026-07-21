@@ -50,7 +50,9 @@ pub fn write_rollback_csv(path: &Path, done: &[(String, String)]) -> std::io::Re
 pub fn load_mapping(path: &Path) -> std::io::Result<Vec<(String, String)>> {
     let bytes = std::fs::read(path)?;
     let bytes = bytes.strip_prefix(BOM).unwrap_or(&bytes);
-    let mut rdr = csv::ReaderBuilder::new().has_headers(true).from_reader(bytes);
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .from_reader(bytes);
     let headers: Vec<String> = rdr
         .headers()?
         .iter()
@@ -93,12 +95,24 @@ mod tests {
                 "Drymk, Insomniak - 1312 (Drymk Remix).wav",
                 "filename",
             ),
-            ("01 Some Artist - Some Title.mp3", "Some Artist - Some Title.mp3", "filename"),
+            (
+                "01 Some Artist - Some Title.mp3",
+                "Some Artist - Some Title.mp3",
+                "filename",
+            ),
             ("Artist - Ti\"tle.mp3", "Artist - Title.mp3", "tags"),
-            ("Sétaou - Prière Païenne.mp3", "Sétaou - Prière Païenne (Über Edit).mp3", "mixed"),
+            (
+                "Sétaou - Prière Païenne.mp3",
+                "Sétaou - Prière Païenne (Über Edit).mp3",
+                "mixed",
+            ),
         ]
         .into_iter()
-        .map(|(o, n, s)| PlanRow { old: o.into(), new: n.into(), origin: s.into() })
+        .map(|(o, n, s)| PlanRow {
+            old: o.into(),
+            new: n.into(),
+            origin: s.into(),
+        })
         .collect()
     }
 
@@ -116,8 +130,7 @@ mod tests {
     fn rollback_csv_bytes_match_python() {
         let td = tempfile::tempdir().unwrap();
         let p = td.path().join("rollback.csv");
-        let done: Vec<(String, String)> =
-            plan_rows().into_iter().map(|r| (r.old, r.new)).collect();
+        let done: Vec<(String, String)> = plan_rows().into_iter().map(|r| (r.old, r.new)).collect();
         write_rollback_csv(&p, &done).unwrap();
         let got = std::fs::read(&p).unwrap();
         let want = include_bytes!("../tests/fixtures/csv_rollback_expected.csv");
@@ -131,8 +144,10 @@ mod tests {
         let plan = td.path().join("plan.csv");
         let rb = td.path().join("rollback.csv");
         write_plan_csv(&plan, &rows).unwrap();
-        let done: Vec<(String, String)> =
-            rows.iter().map(|r| (r.old.clone(), r.new.clone())).collect();
+        let done: Vec<(String, String)> = rows
+            .iter()
+            .map(|r| (r.old.clone(), r.new.clone()))
+            .collect();
         write_rollback_csv(&rb, &done).unwrap();
         let want: Vec<(String, String)> = done;
         assert_eq!(load_mapping(&plan).unwrap(), want);

@@ -25,8 +25,7 @@ static FEAT_WORD: LazyLock<Regex> =
 static FEAT_SPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\s*\bfeat\.\s*").unwrap());
 static FEAT_SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\s+feat\.\s+").unwrap());
 static PARENS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\([^)]*\)").unwrap());
-static SLUG: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[a-z0-9]+(-[a-z0-9.]+)+$").unwrap());
+static SLUG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z0-9]+(-[a-z0-9.]+)+$").unwrap());
 static DJ_WORD: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bDj\b").unwrap());
 static EXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\.[^.]+$").unwrap());
 // leading track number: only clearly numbered forms ("01 ", "1. ", "1 - "),
@@ -38,8 +37,7 @@ static MIX_UNIT: LazyLock<Regex> =
 static LABEL_CODE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*-\s*[A-Z]{2,6}\d{2,4}\s*-\s*").unwrap());
 static SEG_TRIM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^-+\s*|\s*-+$").unwrap());
-static COMPILATION_TRACK: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\d{1,2}\s+\S").unwrap());
+static COMPILATION_TRACK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d{1,2}\s+\S").unwrap());
 static COMPILATION_STRIP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\d{1,2}\s+").unwrap());
 static MIX_PAREN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(&format!(r"(?i)\([^)]*{MIX_KW}[^)]*\)")).unwrap());
@@ -60,7 +58,11 @@ pub struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        Options { source: Source::Tags, alphabetical: true, keep_mix: true }
+        Options {
+            source: Source::Tags,
+            alphabetical: true,
+            keep_mix: true,
+        }
     }
 }
 
@@ -96,7 +98,11 @@ fn std_feat(s: &str) -> String {
 
 /// Python `_sort_names`: comma-split, trim, drop empties, stable sort by lowercase.
 fn sort_names(s: &str) -> String {
-    let mut parts: Vec<&str> = s.split(',').map(str::trim).filter(|p| !p.is_empty()).collect();
+    let mut parts: Vec<&str> = s
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
     parts.sort_by_key(|p| p.to_lowercase());
     parts.join(", ")
 }
@@ -108,7 +114,11 @@ fn sort_artists(a: &str, alphabetical: bool) -> String {
         return a;
     }
     if let Some(m) = FEAT_SPLIT.find(&a) {
-        format!("{} feat. {}", sort_names(&a[..m.start()]), sort_names(&a[m.end()..]))
+        format!(
+            "{} feat. {}",
+            sort_names(&a[..m.start()]),
+            sort_names(&a[m.end()..])
+        )
     } else {
         sort_names(&a)
     }
@@ -155,7 +165,9 @@ fn titlecase_slug(s: &str) -> String {
         .map(|w| {
             let mut cs = w.chars();
             match cs.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + &cs.as_str().to_lowercase(),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>() + &cs.as_str().to_lowercase()
+                }
                 None => String::new(),
             }
         })
@@ -214,7 +226,9 @@ fn parse_from_filename(fn_: &str) -> (Option<String>, String, bool) {
         .collect();
     // compilation: "Artist - Album - NN Track Title"
     if segs.len() >= 3 && COMPILATION_TRACK.is_match(segs.last().unwrap()) {
-        let title = COMPILATION_STRIP.replace(segs.last().unwrap(), "").to_string();
+        let title = COMPILATION_STRIP
+            .replace(segs.last().unwrap(), "")
+            .to_string();
         return (Some(segs[0].clone()), title, true);
     }
     if let Some((a, t)) = base.split_once(" - ") {
@@ -279,21 +293,36 @@ pub fn build_name(file_name: &str, tags: Option<(&str, &str)>, opts: &Options) -
         }
         Source::Tags => {
             if !art.is_empty() && !tit.is_empty() {
-                let t = if opts.keep_mix { add_missing_mix(&tit, &ft) } else { tit.clone() };
+                let t = if opts.keep_mix {
+                    add_missing_mix(&tit, &ft)
+                } else {
+                    tit.clone()
+                };
                 (art.clone(), t, "tags")
             } else {
                 let a = first_nonempty(Some(&art), &fa);
                 let t = first_nonempty(Some(&tit), &ft);
-                let origin = if !art.is_empty() || !tit.is_empty() { "mixed" } else { "filename" };
+                let origin = if !art.is_empty() || !tit.is_empty() {
+                    "mixed"
+                } else {
+                    "filename"
+                };
                 (a, t, origin)
             }
         }
     };
 
-    let a = if a.is_empty() { a } else { sort_artists(&a, opts.alphabetical) };
+    let a = if a.is_empty() {
+        a
+    } else {
+        sort_artists(&a, opts.alphabetical)
+    };
     let t = std_feat(&t);
     if !a.is_empty() && !t.is_empty() {
-        (sanitize(&dedupe_parens(&format!("{a} - {t}"))) + &ext, origin.to_string())
+        (
+            sanitize(&dedupe_parens(&format!("{a} - {t}"))) + &ext,
+            origin.to_string(),
+        )
     } else {
         (String::new(), "manual".to_string())
     }
@@ -316,9 +345,16 @@ where
         .into_iter()
         .map(|fn_| {
             let tags = read_tags(fn_);
-            let (new, origin) =
-                build_name(fn_, tags.as_ref().map(|(a, t)| (a.as_str(), t.as_str())), opts);
-            PlanRow { old: fn_.clone(), new, origin }
+            let (new, origin) = build_name(
+                fn_,
+                tags.as_ref().map(|(a, t)| (a.as_str(), t.as_str())),
+                opts,
+            );
+            PlanRow {
+                old: fn_.clone(),
+                new,
+                origin,
+            }
         })
         .collect();
 
@@ -397,9 +433,7 @@ pub fn two_phase_rename(
             ));
         }
     }
-    let rename = |from: &Path, to: &Path| {
-        crate::retry::on_lock(|| std::fs::rename(from, to))
-    };
+    let rename = |from: &Path, to: &Path| crate::retry::on_lock(|| std::fs::rename(from, to));
 
     // Phase 1: source -> temp. On failure, undo the temps done so far.
     let ts = chrono::Utc::now().timestamp();
@@ -412,8 +446,10 @@ pub fn two_phase_rename(
             }
             return Err(std::io::Error::new(
                 e.kind(),
-                format!("could not rename {old:?} (in use by another process?); \
-                         no files were changed: {e}"),
+                format!(
+                    "could not rename {old:?} (in use by another process?); \
+                         no files were changed: {e}"
+                ),
             ));
         }
         tmp.push((t, new.clone(), old.clone()));
@@ -444,8 +480,10 @@ pub fn two_phase_rename(
             }
             return Err(std::io::Error::new(
                 e.kind(),
-                format!("could not finish renaming {old:?} (in use by another \
-                         process?); other files were restored: {e}"),
+                format!(
+                    "could not finish renaming {old:?} (in use by another \
+                         process?); other files were restored: {e}"
+                ),
             ));
         }
     }
@@ -496,15 +534,23 @@ mod tests {
         touch(td.path(), "Artist - Title.mp3");
         touch(td.path(), "Artist - Title (2).mp3");
         let changes = vec![
-            ("Artist  -  Title.mp3".to_string(), "Artist - Title.mp3".to_string()),
-            ("Artist - Title.mp3".to_string(), "Artist - Title (2).mp3".to_string()),
+            (
+                "Artist  -  Title.mp3".to_string(),
+                "Artist - Title.mp3".to_string(),
+            ),
+            (
+                "Artist - Title.mp3".to_string(),
+                "Artist - Title (2).mp3".to_string(),
+            ),
         ];
         let out = two_phase_rename(td.path(), &changes).unwrap();
         assert_eq!(out.done.len(), 1);
         assert_eq!(out.skipped.len(), 1);
-        assert!(td.path().join("Artist - Title (2) (2).mp3").exists()
-            || td.path().join("Artist - Title (3).mp3").exists()
-            || td.path().join("Artist - Title (2).mp3").exists());
+        assert!(
+            td.path().join("Artist - Title (2) (2).mp3").exists()
+                || td.path().join("Artist - Title (3).mp3").exists()
+                || td.path().join("Artist - Title (2).mp3").exists()
+        );
         // exactly three files remain, nothing lost
         assert_eq!(std::fs::read_dir(td.path()).unwrap().count(), 3);
     }

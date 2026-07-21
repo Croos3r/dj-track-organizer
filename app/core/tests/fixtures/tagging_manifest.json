@@ -1,106 +1,106 @@
 [
- {
-  "name": "wav_plain",
-  "file": "Söme Ärtist - Title (Extended Mix).wav",
-  "artist": "Söme Ärtist",
-  "title": "Title (Extended Mix)",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "wav_junk_smpl",
-  "file": "Artist - With Smpl.wav",
-  "artist": "Artist",
-  "title": "With Smpl",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "wav_old_info_id3",
-  "file": "New Artist - New Title (VIP).wav",
-  "artist": "New Artist",
-  "title": "New Title (VIP)",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "wav_info_before_data",
-  "file": "Furax Style - Beatport Layout.wav",
-  "artist": "Furax Style",
-  "title": "Beatport Layout",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "wav_empty_info_tail",
-  "file": "Artist - Empty Info.wav",
-  "artist": "Artist",
-  "title": "Empty Info",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "wav_no_artist",
-  "file": "justatitle.wav",
-  "artist": "",
-  "title": "justatitle",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "mp3_no_id3",
-  "file": "Artist - Fresh.mp3",
-  "artist": "Artist",
-  "title": "Fresh",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "mp3_small_id3",
-  "file": "Artist With A Longer Name - And A Long Title (Extended Club Mix).mp3",
-  "artist": "Artist With A Longer Name",
-  "title": "And A Long Title (Extended Club Mix)",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "mp3_big_id3",
-  "file": "A - B.mp3",
-  "artist": "A",
-  "title": "B",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "mp3_id3_footer",
-  "file": "A - B (Remix).mp3",
-  "artist": "A",
-  "title": "B (Remix)",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "aiff_plain",
-  "file": "Artist - Aiff Title.aiff",
-  "artist": "Artist",
-  "title": "Aiff Title",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "aiff_trailing_id3",
-  "file": "Artist - Replace Trailing.aif",
-  "artist": "Artist",
-  "title": "Replace Trailing",
-  "status": "ok",
-  "changed": true
- },
- {
-  "name": "aiff_mid_id3",
-  "file": "Artist - Full Rewrite (Flip).aif",
-  "artist": "Artist",
-  "title": "Full Rewrite (Flip)",
-  "status": "ok",
-  "changed": true
- }
+  {
+    "name": "wav_plain",
+    "file": "Söme Ärtist - Title (Extended Mix).wav",
+    "artist": "Söme Ärtist",
+    "title": "Title (Extended Mix)",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "wav_junk_smpl",
+    "file": "Artist - With Smpl.wav",
+    "artist": "Artist",
+    "title": "With Smpl",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "wav_old_info_id3",
+    "file": "New Artist - New Title (VIP).wav",
+    "artist": "New Artist",
+    "title": "New Title (VIP)",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "wav_info_before_data",
+    "file": "Furax Style - Beatport Layout.wav",
+    "artist": "Furax Style",
+    "title": "Beatport Layout",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "wav_empty_info_tail",
+    "file": "Artist - Empty Info.wav",
+    "artist": "Artist",
+    "title": "Empty Info",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "wav_no_artist",
+    "file": "justatitle.wav",
+    "artist": "",
+    "title": "justatitle",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "mp3_no_id3",
+    "file": "Artist - Fresh.mp3",
+    "artist": "Artist",
+    "title": "Fresh",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "mp3_small_id3",
+    "file": "Artist With A Longer Name - And A Long Title (Extended Club Mix).mp3",
+    "artist": "Artist With A Longer Name",
+    "title": "And A Long Title (Extended Club Mix)",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "mp3_big_id3",
+    "file": "A - B.mp3",
+    "artist": "A",
+    "title": "B",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "mp3_id3_footer",
+    "file": "A - B (Remix).mp3",
+    "artist": "A",
+    "title": "B (Remix)",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "aiff_plain",
+    "file": "Artist - Aiff Title.aiff",
+    "artist": "Artist",
+    "title": "Aiff Title",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "aiff_trailing_id3",
+    "file": "Artist - Replace Trailing.aif",
+    "artist": "Artist",
+    "title": "Replace Trailing",
+    "status": "ok",
+    "changed": true
+  },
+  {
+    "name": "aiff_mid_id3",
+    "file": "Artist - Full Rewrite (Flip).aif",
+    "artist": "Artist",
+    "title": "Full Rewrite (Flip)",
+    "status": "ok",
+    "changed": true
+  }
 ]

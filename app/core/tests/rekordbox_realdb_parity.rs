@@ -43,5 +43,8 @@ fn real_db_copy_parity_with_python_tool() {
     // Read-only comparison for now: the write-path parity needs a rename
     // scenario prepared on disk. Assert we can decrypt + read the real schema.
     assert!(!contents.is_empty(), "copied master.db reads back empty");
-    eprintln!("read {} content rows from the copied master.db", contents.len());
+    eprintln!(
+        "read {} content rows from the copied master.db",
+        contents.len()
+    );
 }

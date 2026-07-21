@@ -2,56 +2,137 @@
 // Track Organizer UI: one-click pipeline with review gates before every
 // destructive step (renames, Rekordbox writes, duplicate moves).
 
-import { invoke, listen } from "./bridge";
+import { invoke, listen } from './bridge';
 
 // ---- types mirrored from the Rust command layer --------------------------- //
 
-interface PlanRow { old: string; new: string; origin: string }
+interface PlanRow {
+  old: string;
+  new: string;
+  origin: string;
+}
 interface ScanResult {
-  rows: PlanRow[]; total: number; to_rename: number;
-  already_correct: number; manual: string[]; used_tags: boolean;
+  rows: PlanRow[];
+  total: number;
+  to_rename: number;
+  already_correct: number;
+  manual: string[];
+  used_tags: boolean;
 }
-interface RenameResult { renamed: number; skipped: number; rollback_path: string; plan_path: string }
-interface TagResult { tagged: number; skipped: number; errors: [string, string][] }
-interface RekordboxStatus { running: boolean; db_path: string | null }
+interface RenameResult {
+  renamed: number;
+  skipped: number;
+  rollback_path: string;
+  plan_path: string;
+}
+interface TagResult {
+  tagged: number;
+  skipped: number;
+  errors: [string, string][];
+}
+interface RekordboxStatus {
+  running: boolean;
+  db_path: string | null;
+}
 interface RelinkItem {
-  content_id: string; old_name: string; new_name: string;
-  new_path: string; title: string; artist: string;
+  content_id: string;
+  old_name: string;
+  new_name: string;
+  new_path: string;
+  title: string;
+  artist: string;
 }
-interface RelinkResult { changed: number; backup_path: string }
-interface FileInfo { path: string; artist: string; title: string; dur: number | null; size: number }
-interface DupGroup { kind: string; keeper: FileInfo; extras: FileInfo[] }
-interface DedupScan { groups: DupGroup[]; report_path: string; extras: number; scanned: number }
-interface MoveResult { moved: number; dest: string }
+interface RelinkResult {
+  changed: number;
+  backup_path: string;
+}
+interface FileInfo {
+  path: string;
+  artist: string;
+  title: string;
+  dur: number | null;
+  size: number;
+}
+interface DupGroup {
+  kind: string;
+  keeper: FileInfo;
+  extras: FileInfo[];
+}
+interface DedupScan {
+  groups: DupGroup[];
+  report_path: string;
+  extras: number;
+  scanned: number;
+}
+interface MoveResult {
+  moved: number;
+  dest: string;
+}
 interface RbEntry {
-  id: string; path: string; ext: string; title: string; created: string;
-  cue_ids: string[]; playlist_rows: [string, string][];
-  plays: number; rating: number; comment: string;
+  id: string;
+  path: string;
+  ext: string;
+  title: string;
+  created: string;
+  cue_ids: string[];
+  playlist_rows: [string, string][];
+  plays: number;
+  rating: number;
+  comment: string;
 }
-interface RbDupGroup { kind: string; keeper: RbEntry; extras: RbEntry[] }
-interface RbDedupScan { groups: RbDupGroup[]; entries: number; extras: number; report_path: string }
-interface RbDedupResult { removed: number; backup_path: string }
+interface RbDupGroup {
+  kind: string;
+  keeper: RbEntry;
+  extras: RbEntry[];
+}
+interface RbDedupScan {
+  groups: RbDupGroup[];
+  entries: number;
+  extras: number;
+  report_path: string;
+}
+interface RbDedupResult {
+  removed: number;
+  backup_path: string;
+}
 interface HealthIssue {
-  id: string; severity: "info" | "warning" | "critical";
-  title: string; count: number; description: string;
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  count: number;
+  description: string;
 }
 interface RekordboxHealth {
-  db_path: string; exists: boolean; running: boolean;
-  missing_files: number; missing_file_samples: string[];
-  collection_duplicate_groups: number; collection_duplicate_extras: number;
+  db_path: string;
+  exists: boolean;
+  running: boolean;
+  missing_files: number;
+  missing_file_samples: string[];
+  collection_duplicate_groups: number;
+  collection_duplicate_extras: number;
   inspection_error: string | null;
 }
 interface HealthReport {
-  scanned_at: string; folder: string; score: number;
-  audio_files: number; rename_issues: number; manual_review: number;
-  file_duplicate_groups: number; file_duplicate_extras: number;
-  rekordbox: RekordboxHealth | null; issues: HealthIssue[];
+  scanned_at: string;
+  folder: string;
+  score: number;
+  audio_files: number;
+  rename_issues: number;
+  manual_review: number;
+  file_duplicate_groups: number;
+  file_duplicate_extras: number;
+  rekordbox: RekordboxHealth | null;
+  issues: HealthIssue[];
 }
 interface Settings {
-  last_folder: string | null; master_db: string | null;
-  backup_dir: string | null; duplicates_dir: string | null;
-  alphabetical_artists: boolean; prefer_tags: boolean;
-  set_title: boolean; refresh_artist: boolean;
+  last_folder: string | null;
+  master_db: string | null;
+  backup_dir: string | null;
+  duplicates_dir: string | null;
+  alphabetical_artists: boolean;
+  prefer_tags: boolean;
+  set_title: boolean;
+  refresh_artist: boolean;
   max_threads: number;
 }
 
@@ -72,66 +153,81 @@ let healthBusy = false;
 
 // ---- step chrome ----------------------------------------------------------- //
 
-type StepId = "normalize" | "tag" | "rekordbox" | "dedup" | "rbdedup";
+type StepId = 'normalize' | 'tag' | 'rekordbox' | 'dedup' | 'rbdedup';
 const stepEl = (id: StepId) => $(`#step-${id}`);
 
-function setStep(id: StepId, state: "pending" | "running" | "done" | "skipped" | "error",
-                 chip: string, detail = "") {
+function setStep(
+  id: StepId,
+  state: 'pending' | 'running' | 'done' | 'skipped' | 'error',
+  chip: string,
+  detail = '',
+) {
   const s = stepEl(id);
-  s.classList.remove("running", "done", "skipped", "error");
-  if (state !== "pending") s.classList.add(state);
-  const chipEl = s.querySelector(".chip") as HTMLElement;
+  s.classList.remove('running', 'done', 'skipped', 'error');
+  if (state !== 'pending') s.classList.add(state);
+  const chipEl = s.querySelector('.chip') as HTMLElement;
   chipEl.textContent = chip;
-  chipEl.className = "chip " + ({ running: "run", done: "ok", error: "err", skipped: "", pending: "pending" }[state] ?? "");
-  (s.querySelector(".step-detail") as HTMLElement).textContent = detail;
+  chipEl.className =
+    'chip ' +
+    ({ running: 'run', done: 'ok', error: 'err', skipped: '', pending: 'pending' }[state] ?? '');
+  (s.querySelector('.step-detail') as HTMLElement).textContent = detail;
 }
 
 function resetSteps() {
-  (["normalize", "tag", "rekordbox", "dedup", "rbdedup"] as StepId[]).forEach((id) =>
-    setStep(id, "pending", "waiting"));
-  $("#summary").classList.add("hidden");
-  $("#summary").textContent = "";
+  (['normalize', 'tag', 'rekordbox', 'dedup', 'rbdedup'] as StepId[]).forEach((id) =>
+    setStep(id, 'pending', 'waiting'),
+  );
+  $('#summary').classList.add('hidden');
+  $('#summary').textContent = '';
 }
 
 // ---- library health -------------------------------------------------------- //
 
 function healthScoreLabel(score: number): string {
-  if (score >= 90) return "Healthy";
-  if (score >= 60) return "Needs attention";
-  return "Critical";
+  if (score >= 90) return 'Healthy';
+  if (score >= 60) return 'Needs attention';
+  return 'Critical';
 }
 
 function healthCard(value: number, label: string): HTMLElement {
-  const card = el("div", "health-card");
-  card.append(el("span", "health-card-value", String(value)), el("span", "health-card-label", label));
+  const card = el('div', 'health-card');
+  card.append(
+    el('span', 'health-card-value', String(value)),
+    el('span', 'health-card-label', label),
+  );
   return card;
 }
 
 function healthActionLabel(id: string): string | null {
   switch (id) {
-    case "rename-issues": return "Review organize";
-    case "file-duplicates": return "Review duplicates";
-    case "collection-duplicates": return "Review collection";
-    case "missing-rekordbox-files": return "View paths";
-    default: return null;
+    case 'rename-issues':
+      return 'Review organize';
+    case 'file-duplicates':
+      return 'Review duplicates';
+    case 'collection-duplicates':
+      return 'Review collection';
+    case 'missing-rekordbox-files':
+      return 'View paths';
+    default:
+      return null;
   }
 }
 
 async function showMissingFileSamples(report: HealthReport) {
   const samples = report.rekordbox?.missing_file_samples ?? [];
-  const body = el("div");
+  const body = el('div');
   if (samples.length === 0) {
-    body.appendChild(el("p", "sub", "No sample paths were returned."));
+    body.appendChild(el('p', 'sub', 'No sample paths were returned.'));
   } else {
-    const list = el("ul", "health-sample-list");
-    samples.forEach((path) => list.appendChild(el("li", "mono", path)));
+    const list = el('ul', 'health-sample-list');
+    samples.forEach((path) => list.appendChild(el('li', 'mono', path)));
     body.appendChild(list);
   }
   await showModal({
-    title: `${report.rekordbox?.missing_files ?? 0} missing Rekordbox file${(report.rekordbox?.missing_files ?? 0) === 1 ? "" : "s"}`,
-    sub: "Repair workflow not available yet. These paths are samples from the read-only scan.",
-    okLabel: "Close",
-    cancelLabel: "Close",
+    title: `${report.rekordbox?.missing_files ?? 0} missing Rekordbox file${(report.rekordbox?.missing_files ?? 0) === 1 ? '' : 's'}`,
+    sub: 'Repair workflow not available yet. These paths are samples from the read-only scan.',
+    okLabel: 'Close',
+    cancelLabel: 'Close',
     allowSkip: false,
     body,
   });
@@ -139,51 +235,53 @@ async function showMissingFileSamples(report: HealthReport) {
 
 async function runHealthAction(id: string, report: HealthReport) {
   if (busy || healthBusy || !folder) return;
-  if (id === "rename-issues") {
-    $("#organize-btn").scrollIntoView({ behavior: "smooth", block: "center" });
-    $("#organize-btn").focus();
-  } else if (id === "file-duplicates") {
+  if (id === 'rename-issues') {
+    $('#organize-btn').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#organize-btn').focus();
+  } else if (id === 'file-duplicates') {
     await stepDedup();
-  } else if (id === "collection-duplicates") {
+  } else if (id === 'collection-duplicates') {
     await stepRbDedup();
-  } else if (id === "missing-rekordbox-files") {
+  } else if (id === 'missing-rekordbox-files') {
     await showMissingFileSamples(report);
   }
 }
 
 function renderHealthReport(report: HealthReport) {
   const rb = report.rekordbox;
-  $("#health-score").textContent = String(report.score);
-  $("#health-score-label").textContent = healthScoreLabel(report.score);
-  $("#health-scanned-at").textContent = `Scanned ${new Date(report.scanned_at).toLocaleString()}`;
-  $("#health-status").textContent = "Read-only scan complete.";
-  $("#health-empty").classList.add("hidden");
-  $("#health-results").classList.remove("hidden");
+  $('#health-score').textContent = String(report.score);
+  $('#health-score-label').textContent = healthScoreLabel(report.score);
+  $('#health-scanned-at').textContent = `Scanned ${new Date(report.scanned_at).toLocaleString()}`;
+  $('#health-status').textContent = 'Read-only scan complete.';
+  $('#health-empty').classList.add('hidden');
+  $('#health-results').classList.remove('hidden');
 
-  const cards = $("#health-cards");
-  cards.textContent = "";
+  const cards = $('#health-cards');
+  cards.textContent = '';
   cards.append(
-    healthCard(report.audio_files, "files scanned"),
-    healthCard(report.rename_issues, "rename issues"),
-    healthCard(report.file_duplicate_extras, "duplicate files"),
-    healthCard(rb?.missing_files ?? 0, "missing RB files"),
-    healthCard(rb?.collection_duplicate_extras ?? 0, "collection duplicates"),
+    healthCard(report.audio_files, 'files scanned'),
+    healthCard(report.rename_issues, 'rename issues'),
+    healthCard(report.file_duplicate_extras, 'duplicate files'),
+    healthCard(rb?.missing_files ?? 0, 'missing RB files'),
+    healthCard(rb?.collection_duplicate_extras ?? 0, 'collection duplicates'),
   );
 
-  const issues = $("#health-issues");
-  issues.textContent = "";
+  const issues = $('#health-issues');
+  issues.textContent = '';
   report.issues.forEach((issue) => {
-    const row = el("div", `health-issue severity-${issue.severity}`);
-    row.appendChild(el("span", "health-severity"));
-    const copy = el("div", "health-issue-copy");
-    const title = el("div", "health-issue-title", issue.title);
-    if (issue.count > 0) title.appendChild(el("span", "health-issue-count", `(${issue.count})`));
-    copy.append(title, el("div", "health-issue-description", issue.description));
+    const row = el('div', `health-issue severity-${issue.severity}`);
+    row.appendChild(el('span', 'health-severity'));
+    const copy = el('div', 'health-issue-copy');
+    const title = el('div', 'health-issue-title', issue.title);
+    if (issue.count > 0) title.appendChild(el('span', 'health-issue-count', `(${issue.count})`));
+    copy.append(title, el('div', 'health-issue-description', issue.description));
     row.appendChild(copy);
     const action = healthActionLabel(issue.id);
     if (action) {
-      const button = el("button", "secondary", action) as HTMLButtonElement;
-      button.onclick = () => { void runHealthAction(issue.id, report); };
+      const button = el('button', 'secondary', action) as HTMLButtonElement;
+      button.onclick = () => {
+        void runHealthAction(issue.id, report);
+      };
       row.appendChild(button);
     }
     issues.appendChild(row);
@@ -193,116 +291,129 @@ function renderHealthReport(report: HealthReport) {
 async function scanHealth() {
   if (!folder || healthBusy) return;
   healthBusy = true;
-  const button = $("#health-scan-btn") as HTMLButtonElement;
+  const button = $('#health-scan-btn') as HTMLButtonElement;
   button.disabled = true;
-  button.textContent = "Checkingâ€¦";
-  $("#health-status").textContent = "Scanning libraryâ€¦";
-  $("#health-empty").classList.add("hidden");
-  $("#health-results").classList.add("hidden");
-  $("#health-progress").classList.remove("hidden");
+  button.textContent = 'Checkingâ€¦';
+  $('#health-status').textContent = 'Scanning libraryâ€¦';
+  $('#health-empty').classList.add('hidden');
+  $('#health-results').classList.add('hidden');
+  $('#health-progress').classList.remove('hidden');
   try {
-    const report = await invoke<HealthReport>("health_scan", { folder, settings });
+    const report = await invoke<HealthReport>('health_scan', { folder, settings });
     renderHealthReport(report);
   } catch (error) {
-    $("#health-status").textContent = "Scan failed.";
-    $("#health-empty").textContent = String(error);
-    $("#health-empty").classList.remove("hidden");
+    $('#health-status').textContent = 'Scan failed.';
+    $('#health-empty').textContent = String(error);
+    $('#health-empty').classList.remove('hidden');
   } finally {
     healthBusy = false;
     button.disabled = !folder;
-    button.textContent = "Check library";
-    $("#health-progress").classList.add("hidden");
+    button.textContent = 'Check library';
+    $('#health-progress').classList.add('hidden');
   }
 }
 
 function resetHealthForFolder() {
-  $("#health-scan-btn").removeAttribute("disabled");
-  $("#health-status").textContent = "Folder selected. Run a new read-only scan.";
-  $("#health-empty").textContent = "Your latest scan will appear here.";
-  $("#health-empty").classList.remove("hidden");
-  $("#health-results").classList.add("hidden");
+  $('#health-scan-btn').removeAttribute('disabled');
+  $('#health-status').textContent = 'Folder selected. Run a new read-only scan.';
+  $('#health-empty').textContent = 'Your latest scan will appear here.';
+  $('#health-empty').classList.remove('hidden');
+  $('#health-results').classList.add('hidden');
 }
 
 // ---- modal ----------------------------------------------------------------- //
 
-interface ModalChoice { ok: boolean; skip: boolean }
+interface ModalChoice {
+  ok: boolean;
+  skip: boolean;
+}
 
 function showModal(opts: {
-  title: string; sub: string; okLabel: string;
-  body?: HTMLElement; banner?: HTMLElement; allowSkip?: boolean; cancelLabel?: string;
+  title: string;
+  sub: string;
+  okLabel: string;
+  body?: HTMLElement;
+  banner?: HTMLElement;
+  allowSkip?: boolean;
+  cancelLabel?: string;
 }): Promise<ModalChoice> {
   return new Promise((resolve) => {
-    $("#modal-title").textContent = opts.title;
-    $("#modal-sub").textContent = opts.sub;
-    const body = $("#modal-body");
-    body.textContent = "";
+    $('#modal-title').textContent = opts.title;
+    $('#modal-sub').textContent = opts.sub;
+    const body = $('#modal-body');
+    body.textContent = '';
     if (opts.banner) body.parentElement!.insertBefore(opts.banner, body);
     if (opts.body) body.appendChild(opts.body);
-    const ok = $("#modal-ok") as HTMLButtonElement;
+    const ok = $('#modal-ok') as HTMLButtonElement;
     ok.textContent = opts.okLabel;
-    const skip = $("#modal-skip") as HTMLButtonElement;
-    skip.classList.toggle("hidden", opts.allowSkip === false);
-    $("#modal-cancel").textContent = opts.cancelLabel ?? "Stop pipeline";
-    $("#modal").classList.remove("hidden");
+    const skip = $('#modal-skip') as HTMLButtonElement;
+    skip.classList.toggle('hidden', opts.allowSkip === false);
+    $('#modal-cancel').textContent = opts.cancelLabel ?? 'Stop pipeline';
+    $('#modal').classList.remove('hidden');
 
     const done = (choice: ModalChoice) => {
-      $("#modal").classList.add("hidden");
+      $('#modal').classList.add('hidden');
       opts.banner?.remove();
-      ok.onclick = skip.onclick = ($("#modal-cancel") as HTMLButtonElement).onclick = null;
+      ok.onclick = skip.onclick = ($('#modal-cancel') as HTMLButtonElement).onclick = null;
       resolve(choice);
     };
     ok.onclick = () => done({ ok: true, skip: false });
     skip.onclick = () => done({ ok: false, skip: true });
-    ($("#modal-cancel") as HTMLButtonElement).onclick = () => done({ ok: false, skip: false });
+    ($('#modal-cancel') as HTMLButtonElement).onclick = () => done({ ok: false, skip: false });
   });
 }
 
 // ---- pipeline steps --------------------------------------------------------- //
 
 async function stepNormalize(): Promise<{ mapping: [string, string][]; aborted: boolean }> {
-  setStep("normalize", "running", "scanning…");
-  const scan = await invoke<ScanResult>("scan_plan", { folder, settings });
-  const manualNote = scan.manual.length ? `, ${scan.manual.length} need a manual name` : "";
+  setStep('normalize', 'running', 'scanning…');
+  const scan = await invoke<ScanResult>('scan_plan', { folder, settings });
+  const manualNote = scan.manual.length ? `, ${scan.manual.length} need a manual name` : '';
 
   if (scan.to_rename === 0) {
-    setStep("normalize", "done", "clean", `${scan.total} files already normalized${manualNote}`);
+    setStep('normalize', 'done', 'clean', `${scan.total} files already normalized${manualNote}`);
     return { mapping: [], aborted: false };
   }
 
-  const table = el("table");
-  const thead = el("thead");
-  thead.appendChild(el("tr"));
-  ["Current name", "", "New name"].forEach((h) => thead.firstChild!.appendChild(el("th", "", h)));
+  const table = el('table');
+  const thead = el('thead');
+  thead.appendChild(el('tr'));
+  ['Current name', '', 'New name'].forEach((h) => thead.firstChild!.appendChild(el('th', '', h)));
   table.appendChild(thead);
-  const tbody = el("tbody");
+  const tbody = el('tbody');
   for (const r of scan.rows.filter((r) => r.new && r.new !== r.old)) {
-    const tr = el("tr");
-    const o = el("td", "mono old-name", esc(r.old));
-    const a = el("td", "arrow", "→");
-    const n = el("td", "mono", esc(r.new));
+    const tr = el('tr');
+    const o = el('td', 'mono old-name', esc(r.old));
+    const a = el('td', 'arrow', '→');
+    const n = el('td', 'mono', esc(r.new));
     tr.append(o, a, n);
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
 
   const choice = await showModal({
-    title: `Rename ${scan.to_rename} file${scan.to_rename > 1 ? "s" : ""}?`,
-    sub: `${scan.total} files scanned — ${scan.already_correct} already correct${manualNote}. ` +
-         `A rollback CSV is written so this can be undone.`,
+    title: `Rename ${scan.to_rename} file${scan.to_rename > 1 ? 's' : ''}?`,
+    sub:
+      `${scan.total} files scanned — ${scan.already_correct} already correct${manualNote}. ` +
+      `A rollback CSV is written so this can be undone.`,
     okLabel: `Rename ${scan.to_rename}`,
     body: table,
   });
   if (!choice.ok && !choice.skip) return { mapping: [], aborted: true };
   if (choice.skip) {
-    setStep("normalize", "skipped", "skipped", "no files were renamed");
+    setStep('normalize', 'skipped', 'skipped', 'no files were renamed');
     return { mapping: [], aborted: false };
   }
 
-  setStep("normalize", "running", "renaming…");
-  const res = await invoke<RenameResult>("apply_renames", { folder, rows: scan.rows });
-  const skippedNote = res.skipped ? `, ${res.skipped} skipped (target existed)` : "";
-  setStep("normalize", "done", `${res.renamed} renamed`,
-    `${res.renamed} files renamed${skippedNote}${manualNote} — rollback: rename_rollback.csv`);
+  setStep('normalize', 'running', 'renaming…');
+  const res = await invoke<RenameResult>('apply_renames', { folder, rows: scan.rows });
+  const skippedNote = res.skipped ? `, ${res.skipped} skipped (target existed)` : '';
+  setStep(
+    'normalize',
+    'done',
+    `${res.renamed} renamed`,
+    `${res.renamed} files renamed${skippedNote}${manualNote} — rollback: rename_rollback.csv`,
+  );
   const mapping: [string, string][] = scan.rows
     .filter((r) => r.new && r.new !== r.old)
     .map((r) => [r.old, r.new]);
@@ -310,13 +421,13 @@ async function stepNormalize(): Promise<{ mapping: [string, string][]; aborted: 
 }
 
 async function stepTag(): Promise<boolean> {
-  setStep("tag", "running", "tagging…");
-  const prog = stepEl("tag").querySelector(".progress") as HTMLElement;
-  prog.classList.remove("hidden");
-  const bar = prog.querySelector(".bar") as HTMLElement;
-  const txt = prog.querySelector(".progress-text") as HTMLElement;
+  setStep('tag', 'running', 'tagging…');
+  const prog = stepEl('tag').querySelector('.progress') as HTMLElement;
+  prog.classList.remove('hidden');
+  const bar = prog.querySelector('.bar') as HTMLElement;
+  const txt = prog.querySelector('.progress-text') as HTMLElement;
   const unlisten = await listen<{ done: number; total: number; file: string }>(
-    "tag-progress",
+    'tag-progress',
     (e: { payload: { done: number; total: number; file: string } }) => {
       const { done, total } = e.payload;
       bar.style.width = `${Math.round((done / Math.max(total, 1)) * 100)}%`;
@@ -324,79 +435,88 @@ async function stepTag(): Promise<boolean> {
     },
   );
   try {
-    const res = await invoke<TagResult>("tag_folder", { folder, settings });
-    const errNote = res.errors.length ? `, ${res.errors.length} errors` : "";
-    setStep("tag", res.errors.length ? "error" : "done",
+    const res = await invoke<TagResult>('tag_folder', { folder, settings });
+    const errNote = res.errors.length ? `, ${res.errors.length} errors` : '';
+    setStep(
+      'tag',
+      res.errors.length ? 'error' : 'done',
       `${res.tagged} tagged`,
       `${res.tagged} files tagged from their names${errNote}` +
-      (res.errors.length ? ` — first: ${res.errors[0][0]}: ${res.errors[0][1]}` : ""));
+        (res.errors.length ? ` — first: ${res.errors[0][0]}: ${res.errors[0][1]}` : ''),
+    );
     return true;
   } finally {
     unlisten();
-    prog.classList.add("hidden");
+    prog.classList.add('hidden');
   }
 }
 
 async function stepRekordbox(mapping: [string, string][]): Promise<boolean> {
   if (mapping.length === 0) {
-    setStep("rekordbox", "skipped", "nothing to sync", "no files were renamed this run");
+    setStep('rekordbox', 'skipped', 'nothing to sync', 'no files were renamed this run');
     return true;
   }
-  setStep("rekordbox", "running", "planning…");
-  const status = await invoke<RekordboxStatus>("rekordbox_status", { settings });
+  setStep('rekordbox', 'running', 'planning…');
+  const status = await invoke<RekordboxStatus>('rekordbox_status', { settings });
   if (!status.db_path) {
-    setStep("rekordbox", "error", "no master.db",
-      "master.db not found — set its path in Settings and run again");
+    setStep(
+      'rekordbox',
+      'error',
+      'no master.db',
+      'master.db not found — set its path in Settings and run again',
+    );
     return true;
   }
   const folderName = folder!.split(/[\\/]/).pop() ?? null;
-  const plan = await invoke<RelinkItem[]>("rekordbox_plan", {
-    settings, mapping, folderFilter: folderName,
+  const plan = await invoke<RelinkItem[]>('rekordbox_plan', {
+    settings,
+    mapping,
+    folderFilter: folderName,
   });
   if (plan.length === 0) {
-    setStep("rekordbox", "done", "nothing to relink", "no collection entries matched the renames");
+    setStep('rekordbox', 'done', 'nothing to relink', 'no collection entries matched the renames');
     return true;
   }
 
-  const table = el("table");
-  const thead = el("thead");
-  const hr = el("tr");
-  ["Collection entry", "", "Relinked to"].forEach((h) => hr.appendChild(el("th", "", h)));
+  const table = el('table');
+  const thead = el('thead');
+  const hr = el('tr');
+  ['Collection entry', '', 'Relinked to'].forEach((h) => hr.appendChild(el('th', '', h)));
   thead.appendChild(hr);
   table.appendChild(thead);
-  const tbody = el("tbody");
+  const tbody = el('tbody');
   for (const item of plan) {
-    const tr = el("tr");
+    const tr = el('tr');
     tr.append(
-      el("td", "mono old-name", esc(item.old_name)),
-      el("td", "arrow", "→"),
-      el("td", "mono", esc(item.new_name)),
+      el('td', 'mono old-name', esc(item.old_name)),
+      el('td', 'arrow', '→'),
+      el('td', 'mono', esc(item.new_name)),
     );
     tbody.appendChild(tr);
   }
   table.appendChild(tbody);
 
   // block while Rekordbox runs; re-check on demand
-  const banner = el("div", "banner");
-  const bannerText = el("span", "", "");
-  const recheck = el("button", "", "Re-check") as HTMLButtonElement;
+  const banner = el('div', 'banner');
+  const bannerText = el('span', '', '');
+  const recheck = el('button', '', 'Re-check') as HTMLButtonElement;
   banner.append(bannerText, recheck);
-  const okBtn = $("#modal-ok") as HTMLButtonElement;
+  const okBtn = $('#modal-ok') as HTMLButtonElement;
   const setRunning = (running: boolean) => {
-    banner.classList.toggle("hidden", !running);
+    banner.classList.toggle('hidden', !running);
     okBtn.disabled = running;
-    bannerText.textContent =
-      "Rekordbox is running — close it fully, then hit Re-check.";
+    bannerText.textContent = 'Rekordbox is running — close it fully, then hit Re-check.';
   };
   recheck.onclick = async () => {
-    const s = await invoke<RekordboxStatus>("rekordbox_status", { settings });
+    const s = await invoke<RekordboxStatus>('rekordbox_status', { settings });
     setRunning(s.running);
   };
 
   const modalPromise = showModal({
-    title: `Relink ${plan.length} track${plan.length > 1 ? "s" : ""} in Rekordbox?`,
-    sub: `master.db: ${status.db_path} — a timestamped backup is made first; ` +
-         `cues, beatgrids and playlists are preserved.`,
+    title: `Relink ${plan.length} track${plan.length > 1 ? 's' : ''} in Rekordbox?`,
+    sub:
+      `master.db: ${status.db_path} — a timestamped backup is made first; ` +
+      `cues, beatgrids and playlists are preserved.`,
     okLabel: `Back up & sync`,
     body: table,
     banner,
@@ -407,148 +527,172 @@ async function stepRekordbox(mapping: [string, string][]): Promise<boolean> {
 
   if (!choice.ok && !choice.skip) return false;
   if (choice.skip) {
-    setStep("rekordbox", "skipped", "skipped", "collection not touched");
+    setStep('rekordbox', 'skipped', 'skipped', 'collection not touched');
     return true;
   }
 
-  setStep("rekordbox", "running", "syncing…");
+  setStep('rekordbox', 'running', 'syncing…');
   try {
-    const res = await invoke<RelinkResult>("rekordbox_apply", { settings, plan });
-    setStep("rekordbox", "done", `${res.changed} relinked`,
-      `backup: ${res.backup_path}`);
+    const res = await invoke<RelinkResult>('rekordbox_apply', { settings, plan });
+    setStep('rekordbox', 'done', `${res.changed} relinked`, `backup: ${res.backup_path}`);
   } catch (e) {
-    setStep("rekordbox", "error", "failed", String(e));
+    setStep('rekordbox', 'error', 'failed', String(e));
   }
   return true;
 }
 
 async function stepDedup(): Promise<boolean> {
-  setStep("dedup", "running", "scanning…");
-  const scan = await invoke<DedupScan>("dedup_scan", { folder, settings });
+  setStep('dedup', 'running', 'scanning…');
+  const scan = await invoke<DedupScan>('dedup_scan', { folder, settings });
   if (scan.groups.length === 0) {
-    setStep("dedup", "done", "no duplicates", `${scan.scanned} files scanned, all unique`);
+    setStep('dedup', 'done', 'no duplicates', `${scan.scanned} files scanned, all unique`);
     return true;
   }
 
-  const wrap = el("div");
+  const wrap = el('div');
   const boxes: { cb: HTMLInputElement; path: string }[] = [];
   scan.groups.forEach((g, i) => {
-    const block = el("div", "group-block");
-    block.appendChild(el("div", "group-title",
-      `${g.kind === "exact" ? "identical files" : "same track"} — group ${i + 1}`));
-    const keep = el("div", "group-row");
-    keep.append(el("span", "keeper-star", "★"), el("span", "", esc(basename(g.keeper.path))),
-      el("span", "size", fmtSize(g.keeper.size)));
+    const block = el('div', 'group-block');
+    block.appendChild(
+      el(
+        'div',
+        'group-title',
+        `${g.kind === 'exact' ? 'identical files' : 'same track'} — group ${i + 1}`,
+      ),
+    );
+    const keep = el('div', 'group-row');
+    keep.append(
+      el('span', 'keeper-star', '★'),
+      el('span', '', esc(basename(g.keeper.path))),
+      el('span', 'size', fmtSize(g.keeper.size)),
+    );
     block.appendChild(keep);
     for (const x of g.extras) {
-      const row = el("div", "group-row");
-      const cb = el("input") as HTMLInputElement;
-      cb.type = "checkbox";
+      const row = el('div', 'group-row');
+      const cb = el('input') as HTMLInputElement;
+      cb.type = 'checkbox';
       cb.checked = true;
       boxes.push({ cb, path: x.path });
-      row.append(cb, el("span", "", esc(basename(x.path))), el("span", "size", fmtSize(x.size)));
+      row.append(cb, el('span', '', esc(basename(x.path))), el('span', 'size', fmtSize(x.size)));
       block.appendChild(row);
     }
     wrap.appendChild(block);
   });
 
   const choice = await showModal({
-    title: `Move ${scan.extras} duplicate${scan.extras > 1 ? "s" : ""} aside?`,
+    title: `Move ${scan.extras} duplicate${scan.extras > 1 ? 's' : ''} aside?`,
     sub: `★ marks the copy that stays (best quality, then largest). Ticked files are moved — nothing is deleted.`,
-    okLabel: "Move duplicates",
+    okLabel: 'Move duplicates',
     body: wrap,
   });
   if (!choice.ok && !choice.skip) return false;
   if (choice.skip) {
-    setStep("dedup", "skipped", "skipped", `report written: duplicates.csv`);
+    setStep('dedup', 'skipped', 'skipped', `report written: duplicates.csv`);
     return true;
   }
 
   const extras = boxes.filter((b) => b.cb.checked).map((b) => b.path);
-  setStep("dedup", "running", "moving…");
-  const res = await invoke<MoveResult>("dedup_move", { folder, settings, extras });
-  setStep("dedup", "done", `${res.moved} moved`, `moved to ${res.dest}`);
+  setStep('dedup', 'running', 'moving…');
+  const res = await invoke<MoveResult>('dedup_move', { folder, settings, extras });
+  setStep('dedup', 'done', `${res.moved} moved`, `moved to ${res.dest}`);
   return true;
 }
 
 async function stepRbDedup(): Promise<boolean> {
-  setStep("rbdedup", "running", "scanning…");
+  setStep('rbdedup', 'running', 'scanning…');
   let scan: RbDedupScan;
   try {
-    scan = await invoke<RbDedupScan>("rekordbox_dedup_scan", { folder, settings });
+    scan = await invoke<RbDedupScan>('rekordbox_dedup_scan', { folder, settings });
   } catch (e) {
-    setStep("rbdedup", "error", "failed", String(e));
+    setStep('rbdedup', 'error', 'failed', String(e));
     return true;
   }
   if (scan.groups.length === 0) {
-    setStep("rbdedup", "done", "collection clean",
-      `${scan.entries} collection entries checked, no duplicates`);
+    setStep(
+      'rbdedup',
+      'done',
+      'collection clean',
+      `${scan.entries} collection entries checked, no duplicates`,
+    );
     return true;
   }
 
-  const wrap = el("div");
+  const wrap = el('div');
   const info = (e: RbEntry) =>
     `${e.cue_ids.length} cues · ${e.playlist_rows.length} playlists` +
-    (e.plays ? ` · ${e.plays} plays` : "") + (e.rating ? ` · ★${e.rating}` : "");
+    (e.plays ? ` · ${e.plays} plays` : '') +
+    (e.rating ? ` · ★${e.rating}` : '');
   for (const [i, g] of scan.groups.entries()) {
-    const block = el("div", "group-block");
-    block.appendChild(el("div", "group-title",
-      `${g.kind === "same-file" ? "same file, several entries" : "same track, several entries"} — group ${i + 1}`));
-    const keep = el("div", "group-row");
-    keep.append(el("span", "keeper-star", "★"), el("span", "", basename(g.keeper.path)),
-      el("span", "size", info(g.keeper)));
+    const block = el('div', 'group-block');
+    block.appendChild(
+      el(
+        'div',
+        'group-title',
+        `${g.kind === 'same-file' ? 'same file, several entries' : 'same track, several entries'} — group ${i + 1}`,
+      ),
+    );
+    const keep = el('div', 'group-row');
+    keep.append(
+      el('span', 'keeper-star', '★'),
+      el('span', '', basename(g.keeper.path)),
+      el('span', 'size', info(g.keeper)),
+    );
     block.appendChild(keep);
     for (const x of g.extras) {
-      const row = el("div", "group-row");
-      row.append(el("span", "old-name", "✕"), el("span", "", basename(x.path)),
-        el("span", "size", info(x)));
+      const row = el('div', 'group-row');
+      row.append(
+        el('span', 'old-name', '✕'),
+        el('span', '', basename(x.path)),
+        el('span', 'size', info(x)),
+      );
       block.appendChild(row);
     }
     wrap.appendChild(block);
   }
 
   // same running-gate as the relink step
-  const banner = el("div", "banner");
-  const bannerText = el("span", "",
-    "Rekordbox is running — close it fully, then hit Re-check.");
-  const recheck = el("button", "", "Re-check") as HTMLButtonElement;
+  const banner = el('div', 'banner');
+  const bannerText = el('span', '', 'Rekordbox is running — close it fully, then hit Re-check.');
+  const recheck = el('button', '', 'Re-check') as HTMLButtonElement;
   banner.append(bannerText, recheck);
-  const okBtn = $("#modal-ok") as HTMLButtonElement;
+  const okBtn = $('#modal-ok') as HTMLButtonElement;
   const setRunning = (running: boolean) => {
-    banner.classList.toggle("hidden", !running);
+    banner.classList.toggle('hidden', !running);
     okBtn.disabled = running;
   };
   recheck.onclick = async () => {
-    const s = await invoke<RekordboxStatus>("rekordbox_status", { settings });
+    const s = await invoke<RekordboxStatus>('rekordbox_status', { settings });
     setRunning(s.running);
   };
 
   const modalPromise = showModal({
-    title: `Remove ${scan.extras} duplicate collection entr${scan.extras > 1 ? "ies" : "y"}?`,
-    sub: `★ stays; playlist memberships move to it, and its cues are kept (or inherited if it has none). ` +
-         `A timestamped master.db backup is made first. Files on disk are not touched.`,
-    okLabel: "Back up & clean",
+    title: `Remove ${scan.extras} duplicate collection entr${scan.extras > 1 ? 'ies' : 'y'}?`,
+    sub:
+      `★ stays; playlist memberships move to it, and its cues are kept (or inherited if it has none). ` +
+      `A timestamped master.db backup is made first. Files on disk are not touched.`,
+    okLabel: 'Back up & clean',
     body: wrap,
     banner,
   });
-  invoke<RekordboxStatus>("rekordbox_status", { settings }).then((s) => setRunning(s.running));
+  invoke<RekordboxStatus>('rekordbox_status', { settings }).then((s) => setRunning(s.running));
   const choice = await modalPromise;
   okBtn.disabled = false;
 
   if (!choice.ok && !choice.skip) return false;
   if (choice.skip) {
-    setStep("rbdedup", "skipped", "skipped", `report written: rekordbox_duplicates.csv`);
+    setStep('rbdedup', 'skipped', 'skipped', `report written: rekordbox_duplicates.csv`);
     return true;
   }
 
-  setStep("rbdedup", "running", "cleaning…");
+  setStep('rbdedup', 'running', 'cleaning…');
   try {
-    const res = await invoke<RbDedupResult>("rekordbox_dedup_apply", {
-      settings, groups: scan.groups,
+    const res = await invoke<RbDedupResult>('rekordbox_dedup_apply', {
+      settings,
+      groups: scan.groups,
     });
-    setStep("rbdedup", "done", `${res.removed} removed`, `backup: ${res.backup_path}`);
+    setStep('rbdedup', 'done', `${res.removed} removed`, `backup: ${res.backup_path}`);
   } catch (e) {
-    setStep("rbdedup", "error", "failed", String(e));
+    setStep('rbdedup', 'error', 'failed', String(e));
   }
   return true;
 }
@@ -560,9 +704,9 @@ let busy = false;
 async function organize() {
   if (!folder || busy) return;
   busy = true;
-  const btn = $("#organize-btn") as HTMLButtonElement;
+  const btn = $('#organize-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = "Organizing…";
+  btn.textContent = 'Organizing…';
   resetSteps();
   try {
     const { mapping, aborted } = await stepNormalize();
@@ -576,30 +720,35 @@ async function organize() {
     }
     showSummary(aborted);
   } catch (e) {
-    const sum = $("#summary");
-    sum.classList.remove("hidden");
+    const sum = $('#summary');
+    sum.classList.remove('hidden');
     sum.textContent = `Something went wrong: ${e}`;
   } finally {
     busy = false;
     btn.disabled = false;
-    btn.textContent = "Organize";
+    btn.textContent = 'Organize';
   }
 }
 
 function showSummary(aborted: boolean) {
-  const sum = $("#summary");
-  sum.classList.remove("hidden");
-  sum.textContent = "";
-  sum.appendChild(el("h2", "", aborted ? "Stopped." : "All done."));
-  const line = el("div");
-  line.append("Library: ");
-  const link = el("span", "path-link", folder!);
-  link.onclick = () => invoke("reveal_path", { path: folder });
+  const sum = $('#summary');
+  sum.classList.remove('hidden');
+  sum.textContent = '';
+  sum.appendChild(el('h2', '', aborted ? 'Stopped.' : 'All done.'));
+  const line = el('div');
+  line.append('Library: ');
+  const link = el('span', 'path-link', folder!);
+  link.onclick = () => invoke('reveal_path', { path: folder });
   line.appendChild(link);
   sum.appendChild(line);
   if (!aborted) {
-    sum.appendChild(el("div", "",
-      "Open Rekordbox whenever you like — relinked tracks keep their cues and grids."));
+    sum.appendChild(
+      el(
+        'div',
+        '',
+        'Open Rekordbox whenever you like — relinked tracks keep their cues and grids.',
+      ),
+    );
   }
 }
 
@@ -610,57 +759,57 @@ const fmtSize = (n: number) =>
   n > 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Math.ceil(n / 1024)} KB`;
 
 function bindSettingsDrawer() {
-  const drawer = $("#drawer");
-  $("#settings-btn").onclick = () => {
-    ($("#set-db") as HTMLInputElement).value = settings.master_db ?? "";
-    ($("#set-backup") as HTMLInputElement).value = settings.backup_dir ?? "";
-    ($("#set-dupes") as HTMLInputElement).value = settings.duplicates_dir ?? "";
-    ($("#set-alpha") as HTMLInputElement).checked = settings.alphabetical_artists;
-    ($("#set-tags") as HTMLInputElement).checked = settings.prefer_tags;
-    ($("#set-title") as HTMLInputElement).checked = settings.set_title;
-    ($("#set-artist") as HTMLInputElement).checked = settings.refresh_artist;
-    ($("#set-threads") as HTMLInputElement).value = String(settings.max_threads ?? 0);
-    drawer.classList.remove("hidden");
+  const drawer = $('#drawer');
+  $('#settings-btn').onclick = () => {
+    ($('#set-db') as HTMLInputElement).value = settings.master_db ?? '';
+    ($('#set-backup') as HTMLInputElement).value = settings.backup_dir ?? '';
+    ($('#set-dupes') as HTMLInputElement).value = settings.duplicates_dir ?? '';
+    ($('#set-alpha') as HTMLInputElement).checked = settings.alphabetical_artists;
+    ($('#set-tags') as HTMLInputElement).checked = settings.prefer_tags;
+    ($('#set-title') as HTMLInputElement).checked = settings.set_title;
+    ($('#set-artist') as HTMLInputElement).checked = settings.refresh_artist;
+    ($('#set-threads') as HTMLInputElement).value = String(settings.max_threads ?? 0);
+    drawer.classList.remove('hidden');
   };
-  $("#drawer-close").onclick = async () => {
+  $('#drawer-close').onclick = async () => {
     const v = (id: string) => ($(id) as HTMLInputElement).value.trim() || null;
     const c = (id: string) => ($(id) as HTMLInputElement).checked;
     settings = {
       ...settings,
-      master_db: v("#set-db"),
-      backup_dir: v("#set-backup"),
-      duplicates_dir: v("#set-dupes"),
-      alphabetical_artists: c("#set-alpha"),
-      prefer_tags: c("#set-tags"),
-      set_title: c("#set-title"),
-      refresh_artist: c("#set-artist"),
-      max_threads: Math.max(0, parseInt(($("#set-threads") as HTMLInputElement).value, 10) || 0),
+      master_db: v('#set-db'),
+      backup_dir: v('#set-backup'),
+      duplicates_dir: v('#set-dupes'),
+      alphabetical_artists: c('#set-alpha'),
+      prefer_tags: c('#set-tags'),
+      set_title: c('#set-title'),
+      refresh_artist: c('#set-artist'),
+      max_threads: Math.max(0, parseInt(($('#set-threads') as HTMLInputElement).value, 10) || 0),
     };
-    await invoke("save_settings", { settings });
-    drawer.classList.add("hidden");
+    await invoke('save_settings', { settings });
+    drawer.classList.add('hidden');
   };
 }
 
 async function setFolder(path: string | null) {
   if (!path) return;
   folder = path;
-  $("#folder-path").textContent = path;
-  ($("#organize-btn") as HTMLButtonElement).disabled = false;
+  $('#folder-path').textContent = path;
+  ($('#organize-btn') as HTMLButtonElement).disabled = false;
   resetHealthForFolder();
   settings = { ...settings, last_folder: path };
-  await invoke("save_settings", { settings });
+  await invoke('save_settings', { settings });
 }
 
 async function main() {
-  settings = await invoke<Settings>("get_settings");
+  settings = await invoke<Settings>('get_settings');
   bindSettingsDrawer();
   if (settings.last_folder) await setFolder(settings.last_folder);
-  $("#browse-btn").onclick = async () => {
-    const picked = await invoke<string | null>("pick_folder", { initial: folder });
+  $('#browse-btn').onclick = async () => {
+    const picked = await invoke<string | null>('pick_folder', { initial: folder });
     await setFolder(picked);
   };
-  $("#organize-btn").onclick = organize;
-  $("#health-scan-btn").onclick = scanHealth;
+  $('#organize-btn').onclick = organize;
+  $('#health-scan-btn').onclick = scanHealth;
   resetSteps();
 }
 

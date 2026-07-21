@@ -36,7 +36,9 @@ fn dedup_matches_python_oracle() {
     for s in scenarios() {
         let td = tempfile::tempdir().unwrap();
         for (rel, marker, size) in &s.files {
-            let p = td.path().join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
+            let p = td
+                .path()
+                .join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
             std::fs::create_dir_all(p.parent().unwrap()).unwrap();
             let content: Vec<u8> = marker.bytes().cycle().take(*size as usize).collect();
             std::fs::write(p, content).unwrap();
@@ -68,10 +70,19 @@ fn dedup_matches_python_oracle() {
         );
 
         let bytes = std::fs::read(&report_path).unwrap();
-        let text = String::from_utf8(bytes.strip_prefix(b"\xef\xbb\xbf".as_slice()).unwrap().to_vec())
-            .unwrap();
+        let text = String::from_utf8(
+            bytes
+                .strip_prefix(b"\xef\xbb\xbf".as_slice())
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap();
         let root = td.path().to_string_lossy().into_owned();
         let normalized = text.replace(&root, "<ROOT>").replace('\\', "/");
-        assert_eq!(normalized, s.report, "{}: report differs from oracle", s.name);
+        assert_eq!(
+            normalized, s.report,
+            "{}: report differs from oracle",
+            s.name
+        );
     }
 }

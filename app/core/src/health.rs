@@ -51,7 +51,10 @@ mod tests {
     #[test]
     fn score_applies_each_penalty_and_clamps() {
         assert_eq!(score(20, 10, 10, true, 1), 89);
-        assert_eq!(score(usize::MAX, usize::MAX, usize::MAX, true, usize::MAX), 5);
+        assert_eq!(
+            score(usize::MAX, usize::MAX, usize::MAX, true, usize::MAX),
+            5
+        );
     }
 
     #[test]
@@ -83,8 +86,18 @@ mod tests {
         };
         let entries = vec![
             entry(existing.to_string_lossy().into_owned()),
-            entry(td.path().join("missing-a.wav").to_string_lossy().into_owned()),
-            entry(td.path().join("missing-b.wav").to_string_lossy().into_owned()),
+            entry(
+                td.path()
+                    .join("missing-a.wav")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+            entry(
+                td.path()
+                    .join("missing-b.wav")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
         ];
 
         let (count, samples) = missing_rekordbox_files(&entries, 1);

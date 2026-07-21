@@ -113,7 +113,10 @@ fn write_mp3(path: &Path, artist: &str, title: &str) -> Result<(), TagError> {
     if old_len >= frames.len() {
         // existing tag has room: overwrite in place, no audio movement
         let tag = build_id3(artist, title, Some(old_len));
-        let mut f = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+        let mut f = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)?;
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&tag)?;
     } else {
@@ -175,7 +178,12 @@ fn read_chunks(path: &Path, big_endian: bool) -> Result<IffFile, TagError> {
         chunks.push(Chunk { id, pos, size });
         pos += 8 + size as u64 + (size & 1) as u64;
     }
-    Ok(IffFile { magic, form_type, file_size, chunks })
+    Ok(IffFile {
+        magic,
+        form_type,
+        file_size,
+        chunks,
+    })
 }
 
 /// Read a chunk's raw bytes (header + body + pad), tolerating truncation like
@@ -273,7 +281,10 @@ fn write_wav(path: &Path, artist: &str, title: &str) -> Result<(), TagError> {
         }
     }
     keep.extend_from_slice(&info);
-    let f = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let f = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)?;
     f.set_len(tail_start)?;
     let mut f = f;
     f.seek(SeekFrom::End(0))?;
@@ -335,7 +346,10 @@ fn write_aiff(path: &Path, artist: &str, title: &str) -> Result<(), TagError> {
     if n > 0 && iff.chunks[..n - 1].iter().any(|c| &c.id == b"ID3 ") {
         return aiff_full_rewrite(path, artist, title);
     }
-    let f = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let f = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)?;
     f.set_len(end)?;
     let mut f = f;
     f.seek(SeekFrom::End(0))?;

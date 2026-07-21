@@ -22,7 +22,10 @@ use organizer_core::dedup::{
 use organizer_core::tagging;
 
 fn env_num(key: &str, default: usize) -> usize {
-    std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 /// Deterministic per-file pseudo-random byte stream (xorshift64).
@@ -110,14 +113,45 @@ fn aiff_bytes(body_len: usize, seed: u64) -> Vec<u8> {
 }
 
 const ARTISTS: &[&str] = &[
-    "Angerfist", "3 Steps Ahead", "12 Inch", "DJ Furax", "Neophyte", "Von Bikräv", "Aexhy",
-    "Sétaou", "Alignment", "I Hate Models", "Zatox", "APY", "Drymk", "Insomniak",
+    "Angerfist",
+    "3 Steps Ahead",
+    "12 Inch",
+    "DJ Furax",
+    "Neophyte",
+    "Von Bikräv",
+    "Aexhy",
+    "Sétaou",
+    "Alignment",
+    "I Hate Models",
+    "Zatox",
+    "APY",
+    "Drymk",
+    "Insomniak",
 ];
 const TITLES: &[&str] = &[
-    "Dream", "Gangster", "Supersaw", "Rave", "Moulin Rouge", "Prière Païenne", "Terror",
-    "Impact", "Hardcore", "Bass D", "Money In My Pocket", "The Tunnel", "1312", "Vitesse",
+    "Dream",
+    "Gangster",
+    "Supersaw",
+    "Rave",
+    "Moulin Rouge",
+    "Prière Païenne",
+    "Terror",
+    "Impact",
+    "Hardcore",
+    "Bass D",
+    "Money In My Pocket",
+    "The Tunnel",
+    "1312",
+    "Vitesse",
 ];
-const MIXES: &[&str] = &["", "", " (Original Mix)", " (Extended Mix)", " (Von Bikräv Remix)", " (Edit)"];
+const MIXES: &[&str] = &[
+    "",
+    "",
+    " (Original Mix)",
+    " (Extended Mix)",
+    " (Von Bikräv Remix)",
+    " (Edit)",
+];
 
 /// A messy, never-normalized filename (track-number prefixes, mixed case,
 /// underscores, feat variants, occasional missing " - ").
@@ -125,9 +159,25 @@ fn messy_name(rng: &mut Rng, artist: &str, title: &str, mix: &str, ext: &str) ->
     let r = rng.next_u64();
     let base = match r % 6 {
         0 => format!("{:02} {} - {}{}", (r >> 8) % 20 + 1, artist, title, mix),
-        1 => format!("{}_-_{}{}", artist.replace(' ', "_"), title.replace(' ', "_"), mix),
-        2 => format!("{} - {} feat {}{}", artist, title, ARTISTS[(r as usize >> 4) % ARTISTS.len()], mix),
-        3 => format!("{} - {}{}", artist.to_uppercase(), title.to_uppercase(), mix),
+        1 => format!(
+            "{}_-_{}{}",
+            artist.replace(' ', "_"),
+            title.replace(' ', "_"),
+            mix
+        ),
+        2 => format!(
+            "{} - {} feat {}{}",
+            artist,
+            title,
+            ARTISTS[(r as usize >> 4) % ARTISTS.len()],
+            mix
+        ),
+        3 => format!(
+            "{} - {}{}",
+            artist.to_uppercase(),
+            title.to_uppercase(),
+            mix
+        ),
         4 => format!("{}{}", title, mix), // no " - " -> needs manual name
         _ => format!("{} - {}{}", artist, title, mix),
     };
@@ -157,7 +207,12 @@ fn build_corpus(n: usize, max_kb: usize) -> std::io::Result<Corpus> {
         };
         let mut name = messy_name(rng, a, t, m, ext);
         while !used_names.insert(name.clone()) {
-            name = format!("{} {}{}", &name[..name.len() - ext.len()], rng.next_u64() % 999, ext);
+            name = format!(
+                "{} {}{}",
+                &name[..name.len() - ext.len()],
+                rng.next_u64() % 999,
+                ext
+            );
         }
         (name, bytes)
     };
@@ -172,8 +227,18 @@ fn build_corpus(n: usize, max_kb: usize) -> std::io::Result<Corpus> {
     for i in 0..(n / 12).max(1) {
         let src = &files[(rng.next_u64() as usize) % files.len()];
         let bytes = src.1.clone();
-        let ext = src.0.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
-        let mut name = messy_name(&mut rng, ARTISTS[i % ARTISTS.len()], TITLES[i % TITLES.len()], "", &ext);
+        let ext = src
+            .0
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy()))
+            .unwrap_or_default();
+        let mut name = messy_name(
+            &mut rng,
+            ARTISTS[i % ARTISTS.len()],
+            TITLES[i % TITLES.len()],
+            "",
+            &ext,
+        );
         while !used_names.insert(name.clone()) {
             name = format!("dup{}_{}", i, name);
         }
@@ -227,7 +292,9 @@ fn secs(d: std::time::Duration) -> f64 {
 fn main() {
     let n = env_num("BENCH_FILES", 600);
     let max_kb = env_num("BENCH_MAXKB", 3072);
-    let cores = std::thread::available_parallelism().map(|c| c.get()).unwrap_or(1);
+    let cores = std::thread::available_parallelism()
+        .map(|c| c.get())
+        .unwrap_or(1);
     println!("=== Track Organizer speedup benchmark ===");
     println!("cores available: {cores}\n");
 
@@ -241,14 +308,30 @@ fn main() {
     println!("    I/O a cold, larger-than-RAM library would actually pay.\n");
     let variants: &[(&str, HashStrategy)] = &[
         ("baseline  SHA1 · full   · seq ", HashStrategy::baseline()),
-        ("+rayon    SHA1 · full   · auto", HashStrategy { parallelism: 0, ..HashStrategy::baseline() }),
-        ("+smart    blake3 · prefix · seq ", HashStrategy { algo: HashAlgo::Blake3, prefix_gate: true, parallelism: 1 }),
+        (
+            "+rayon    SHA1 · full   · auto",
+            HashStrategy {
+                parallelism: 0,
+                ..HashStrategy::baseline()
+            },
+        ),
+        (
+            "+smart    blake3 · prefix · seq ",
+            HashStrategy {
+                algo: HashAlgo::Blake3,
+                prefix_gate: true,
+                parallelism: 1,
+            },
+        ),
         ("+both     blake3 · prefix · auto", HashStrategy::default()),
     ];
     let mut baseline_groups: Option<Vec<Vec<PathBuf>>> = None;
     let mut base_time = 0f64;
     let mut base_bytes = 0u64;
-    println!("    {:<34}  {:>9}  {:>9}  {:>10}  {:>8}", "strategy", "time", "speedup", "read", "io-save");
+    println!(
+        "    {:<34}  {:>9}  {:>9}  {:>10}  {:>8}",
+        "strategy", "time", "speedup", "read", "io-save"
+    );
     for (label, strat) in variants {
         // best of 2 warm runs
         let mut best = f64::MAX;
@@ -260,14 +343,21 @@ fn main() {
             let g = find_exact_with(&infos, *strat).unwrap();
             best = best.min(secs(t.elapsed()));
             bytes = BYTES_HASHED.load(Ordering::Relaxed);
-            groups = g.iter().map(|grp| grp.iter().map(|f| f.path.clone()).collect()).collect();
+            groups = g
+                .iter()
+                .map(|grp| grp.iter().map(|f| f.path.clone()).collect())
+                .collect();
         }
         if baseline_groups.is_none() {
             baseline_groups = Some(groups.clone());
             base_time = best;
             base_bytes = bytes;
         } else {
-            assert_eq!(&groups, baseline_groups.as_ref().unwrap(), "{label} changed the groups!");
+            assert_eq!(
+                &groups,
+                baseline_groups.as_ref().unwrap(),
+                "{label} changed the groups!"
+            );
         }
         println!(
             "    {:<34}  {:>7.3}s  {:>8.2}x  {:>8.0}MB  {:>7.1}x",
@@ -279,7 +369,10 @@ fn main() {
         );
     }
     let dup_groups = baseline_groups.unwrap();
-    println!("    (identical output across all four; {} exact-dup groups found)", dup_groups.len());
+    println!(
+        "    (identical output across all four; {} exact-dup groups found)",
+        dup_groups.len()
+    );
 
     // ---- Scan: parallel tag reads ---------------------------------------- //
     println!("\n[2] Library scan / tag read (scan_with)");
@@ -294,7 +387,11 @@ fn main() {
             best = best.min(secs(t.elapsed()));
             assert_eq!(got.len(), infos.len());
         }
-        let tag = if par == 1 { "sequential" } else { "parallel (auto)" };
+        let tag = if par == 1 {
+            "sequential"
+        } else {
+            "parallel (auto)"
+        };
         println!("    {:<16}  {:>7.3}s", tag, best);
     }
 
@@ -307,12 +404,23 @@ fn main() {
         let t = Instant::now();
         let results = tagging::tag_files(&paths, par, || {});
         let elapsed = secs(t.elapsed());
-        let ok = results.iter().filter(|(_, r)| matches!(r, Ok(tagging::TagStatus::Ok))).count();
+        let ok = results
+            .iter()
+            .filter(|(_, r)| matches!(r, Ok(tagging::TagStatus::Ok)))
+            .count();
         if par == 1 {
             tag_base = elapsed;
-            println!("    {:<16}  {:>7.3}s  {:>8}       ({ok} tagged)", "sequential", elapsed, "1.00x");
+            println!(
+                "    {:<16}  {:>7.3}s  {:>8}       ({ok} tagged)",
+                "sequential", elapsed, "1.00x"
+            );
         } else {
-            println!("    {:<16}  {:>7.3}s  {:>7.2}x       ({ok} tagged)", "parallel (auto)", elapsed, tag_base / elapsed);
+            println!(
+                "    {:<16}  {:>7.3}s  {:>7.2}x       ({ok} tagged)",
+                "parallel (auto)",
+                elapsed,
+                tag_base / elapsed
+            );
         }
     }
     corpus.restore();

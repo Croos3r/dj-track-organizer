@@ -79,8 +79,10 @@ pub fn build_relink_plan(
     mapping: &[(String, String)],
     folder_filter: Option<&str>,
 ) -> Result<Vec<RelinkItem>> {
-    let map: HashMap<&str, &str> =
-        mapping.iter().map(|(o, n)| (o.as_str(), n.as_str())).collect();
+    let map: HashMap<&str, &str> = mapping
+        .iter()
+        .map(|(o, n)| (o.as_str(), n.as_str()))
+        .collect();
     let mut plan = Vec::new();
     for c in db.get_contents()? {
         let folder_path = c.folder_path.clone().unwrap_or_default();
@@ -143,7 +145,11 @@ pub struct ApplyOptions {
 
 impl Default for ApplyOptions {
     fn default() -> Self {
-        ApplyOptions { set_title: true, refresh_artist: true, allow_while_running: false }
+        ApplyOptions {
+            set_title: true,
+            refresh_artist: true,
+            allow_while_running: false,
+        }
     }
 }
 
@@ -348,8 +354,10 @@ pub fn find_rb_dup_groups(entries: &[RbEntry]) -> Vec<RbDupGroup> {
         let items = &by_path[k];
         if items.len() > 1 {
             grouped_ids.extend(items.iter().map(|e| e.id.as_str()));
-            raw_groups
-                .push(("same-file".into(), items.iter().map(|e| (*e).clone()).collect()));
+            raw_groups.push((
+                "same-file".into(),
+                items.iter().map(|e| (*e).clone()).collect(),
+            ));
         }
     }
 
@@ -375,8 +383,10 @@ pub fn find_rb_dup_groups(entries: &[RbEntry]) -> Vec<RbDupGroup> {
         let distinct_paths: std::collections::HashSet<String> =
             items.iter().map(|e| rb_path_key(&e.path)).collect();
         if items.len() > 1 && distinct_paths.len() > 1 {
-            raw_groups
-                .push(("same-song".into(), items.iter().map(|e| (*e).clone()).collect()));
+            raw_groups.push((
+                "same-song".into(),
+                items.iter().map(|e| (*e).clone()).collect(),
+            ));
         }
     }
 
@@ -384,7 +394,11 @@ pub fn find_rb_dup_groups(entries: &[RbEntry]) -> Vec<RbDupGroup> {
         .into_iter()
         .map(|(kind, g)| {
             let (keeper, extras) = rb_keeper(g);
-            RbDupGroup { kind, keeper, extras }
+            RbDupGroup {
+                kind,
+                keeper,
+                extras,
+            }
         })
         .collect()
 }
@@ -412,8 +426,12 @@ pub fn apply_rb_dedup(
 
     let mut removed = 0;
     for g in groups {
-        let mut keeper_playlists: std::collections::HashSet<String> =
-            g.keeper.playlist_rows.iter().map(|(_, pl)| pl.clone()).collect();
+        let mut keeper_playlists: std::collections::HashSet<String> = g
+            .keeper
+            .playlist_rows
+            .iter()
+            .map(|(_, pl)| pl.clone())
+            .collect();
         let mut keeper_has_cues = !g.keeper.cue_ids.is_empty();
         for extra in &g.extras {
             for (row_id, playlist_id) in &extra.playlist_rows {
@@ -459,7 +477,15 @@ pub fn write_rb_dedup_report(path: &Path, groups: &[RbDupGroup]) -> std::io::Res
         .quote_style(csv::QuoteStyle::Necessary)
         .from_writer(file);
     w.write_record([
-        "group", "kind", "role", "entry_id", "path", "cues", "playlists", "plays", "rating",
+        "group",
+        "kind",
+        "role",
+        "entry_id",
+        "path",
+        "cues",
+        "playlists",
+        "plays",
+        "rating",
         "created",
     ])?;
     let mut extras = 0;
@@ -510,9 +536,18 @@ mod rb_dedup_tests {
 
     #[test]
     fn path_key_folds_case_slashes_and_dots() {
-        assert_eq!(rb_path_key("D:/Music/Track/A.wav"), rb_path_key("d:\\music\\TRACK\\a.wav"));
-        assert_eq!(rb_path_key("D:/Music/./Track/../Track/A.wav"), rb_path_key("D:/Music/Track/A.wav"));
-        assert_ne!(rb_path_key("D:/Music/Track/A.wav"), rb_path_key("D:/Music/Track/B.wav"));
+        assert_eq!(
+            rb_path_key("D:/Music/Track/A.wav"),
+            rb_path_key("d:\\music\\TRACK\\a.wav")
+        );
+        assert_eq!(
+            rb_path_key("D:/Music/./Track/../Track/A.wav"),
+            rb_path_key("D:/Music/Track/A.wav")
+        );
+        assert_ne!(
+            rb_path_key("D:/Music/Track/A.wav"),
+            rb_path_key("D:/Music/Track/B.wav")
+        );
     }
 
     #[test]
@@ -523,7 +558,11 @@ mod rb_dedup_tests {
         a.cue_ids = vec!["c1".into(), "c2".into()]; // more info -> keeper
         c.plays = 5;
         let groups = find_rb_dup_groups(&[a.clone(), b.clone(), c.clone()]);
-        assert_eq!(groups.len(), 1, "same-song group needs 2 distinct paths outside same-file");
+        assert_eq!(
+            groups.len(),
+            1,
+            "same-song group needs 2 distinct paths outside same-file"
+        );
         assert_eq!(groups[0].kind, "same-file");
         assert_eq!(groups[0].keeper.id, "1", "entry with cues wins the tie");
         assert_eq!(groups[0].extras.len(), 1);
@@ -537,6 +576,9 @@ mod rb_dedup_tests {
         let groups = find_rb_dup_groups(&[mp3.clone(), wav.clone(), other]);
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].kind, "same-song");
-        assert_eq!(groups[0].keeper.id, "1", "lossless wins regardless of order");
+        assert_eq!(
+            groups[0].keeper.id, "1",
+            "lossless wins regardless of order"
+        );
     }
 }

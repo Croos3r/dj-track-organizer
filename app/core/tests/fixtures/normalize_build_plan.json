@@ -1,89 +1,86 @@
 [
- {
-  "name": "collision_suffixes",
-  "files": [
-   "Artist - Title.mp3",
-   "Artist_-_Title.mp3",
-   "Artist  -  Title.mp3",
-   "Artist - Title (2).mp3"
-  ],
-  "rows": [
-   {
-    "old": "Artist  -  Title.mp3",
-    "new": "Artist - Title.mp3",
-    "source": "filename"
-   },
-   {
-    "old": "Artist - Title (2).mp3",
-    "new": "Artist - Title (2).mp3",
-    "source": "filename"
-   },
-   {
-    "old": "Artist - Title.mp3",
-    "new": "Artist - Title (2).mp3",
-    "source": "filename"
-   },
-   {
-    "old": "Artist_-_Title.mp3",
-    "new": "",
-    "source": "manual"
-   }
-  ]
- },
- {
-  "name": "mixed_bag",
-  "files": [
-   "01 Some Artist - Some Title.mp3",
-   "12 Inch - Dirtytech (Schranz Edit).wav",
-   "Mastering msbtwu.wav",
-   "Zeta, Alpha - Together.mp3",
-   "Angerfist - And Jesus Wept.wav"
-  ],
-  "rows": [
-   {
-    "old": "01 Some Artist - Some Title.mp3",
-    "new": "Some Artist - Some Title.mp3",
-    "source": "filename"
-   },
-   {
-    "old": "12 Inch - Dirtytech (Schranz Edit).wav",
-    "new": "12 Inch - Dirtytech (Schranz Edit).wav",
-    "source": "filename"
-   },
-   {
-    "old": "Angerfist - And Jesus Wept.wav",
-    "new": "Angerfist - And Jesus Wept.wav",
-    "source": "filename"
-   },
-   {
-    "old": "Mastering msbtwu.wav",
-    "new": "",
-    "source": "manual"
-   },
-   {
-    "old": "Zeta, Alpha - Together.mp3",
-    "new": "Alpha, Zeta - Together.mp3",
-    "source": "filename"
-   }
-  ]
- },
- {
-  "name": "swap_targets",
-  "files": [
-   "B, A - Song.mp3",
-   "A, B - Song (2).mp3"
-  ],
-  "rows": [
-   {
-    "old": "A, B - Song (2).mp3",
-    "new": "A, B - Song (2).mp3",
-    "source": "filename"
-   },
-   {
-    "old": "B, A - Song.mp3",
-    "new": "A, B - Song.mp3",
-    "source": "filename"
-   }
-  ]
- }
+  {
+    "name": "collision_suffixes",
+    "files": [
+      "Artist - Title.mp3",
+      "Artist_-_Title.mp3",
+      "Artist  -  Title.mp3",
+      "Artist - Title (2).mp3"
+    ],
+    "rows": [
+      {
+        "old": "Artist  -  Title.mp3",
+        "new": "Artist - Title.mp3",
+        "source": "filename"
+      },
+      {
+        "old": "Artist - Title (2).mp3",
+        "new": "Artist - Title (2).mp3",
+        "source": "filename"
+      },
+      {
+        "old": "Artist - Title.mp3",
+        "new": "Artist - Title (2).mp3",
+        "source": "filename"
+      },
+      {
+        "old": "Artist_-_Title.mp3",
+        "new": "",
+        "source": "manual"
+      }
+    ]
+  },
+  {
+    "name": "mixed_bag",
+    "files": [
+      "01 Some Artist - Some Title.mp3",
+      "12 Inch - Dirtytech (Schranz Edit).wav",
+      "Mastering msbtwu.wav",
+      "Zeta, Alpha - Together.mp3",
+      "Angerfist - And Jesus Wept.wav"
+    ],
+    "rows": [
+      {
+        "old": "01 Some Artist - Some Title.mp3",
+        "new": "Some Artist - Some Title.mp3",
+        "source": "filename"
+      },
+      {
+        "old": "12 Inch - Dirtytech (Schranz Edit).wav",
+        "new": "12 Inch - Dirtytech (Schranz Edit).wav",
+        "source": "filename"
+      },
+      {
+        "old": "Angerfist - And Jesus Wept.wav",
+        "new": "Angerfist - And Jesus Wept.wav",
+        "source": "filename"
+      },
+      {
+        "old": "Mastering msbtwu.wav",
+        "new": "",
+        "source": "manual"
+      },
+      {
+        "old": "Zeta, Alpha - Together.mp3",
+        "new": "Alpha, Zeta - Together.mp3",
+        "source": "filename"
+      }
+    ]
+  },
+  {
+    "name": "swap_targets",
+    "files": ["B, A - Song.mp3", "A, B - Song (2).mp3"],
+    "rows": [
+      {
+        "old": "A, B - Song (2).mp3",
+        "new": "A, B - Song (2).mp3",
+        "source": "filename"
+      },
+      {
+        "old": "B, A - Song.mp3",
+        "new": "A, B - Song.mp3",
+        "source": "filename"
+      }
+    ]
+  }
 ]

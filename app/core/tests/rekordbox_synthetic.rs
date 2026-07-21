@@ -27,8 +27,10 @@ fn make_db(dir: &Path, tracks: &[(&str, &str)]) -> (PathBuf, MasterDb) {
                 .lines()
                 .filter(|l| !l.trim_start().starts_with("--"))
                 .collect::<Vec<_>>()
-                .join("
-");
+                .join(
+                    "
+",
+                );
             if sql.trim().is_empty() {
                 continue;
             }
@@ -50,7 +52,10 @@ fn make_db(dir: &Path, tracks: &[(&str, &str)]) -> (PathBuf, MasterDb) {
 }
 
 fn mapping(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-    pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+    pairs
+        .iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect()
 }
 
 #[test]
@@ -75,12 +80,17 @@ fn plan_matches_only_mapped_names_in_scope() {
     let item = &plan[0];
     assert_eq!(item.old_name, "Insomniak, Drymk - 1312 (Drymk Remix).wav");
     assert_eq!(item.new_name, "Drymk, Insomniak - 1312 (Drymk Remix).wav");
-    assert!(item.new_path.ends_with("/Track/Drymk, Insomniak - 1312 (Drymk Remix).wav"));
+    assert!(item
+        .new_path
+        .ends_with("/Track/Drymk, Insomniak - 1312 (Drymk Remix).wav"));
     assert_eq!(item.title, "1312 (Drymk Remix)");
     assert_eq!(item.artist, "Drymk, Insomniak");
 
     // no filter: no-op mappings (new == old) still excluded
-    let noop = mapping(&[("Angerfist - And Jesus Wept.wav", "Angerfist - And Jesus Wept.wav")]);
+    let noop = mapping(&[(
+        "Angerfist - And Jesus Wept.wav",
+        "Angerfist - And Jesus Wept.wav",
+    )]);
     assert!(build_relink_plan(&mut db, &noop, None).unwrap().is_empty());
 }
 
@@ -92,8 +102,12 @@ fn apply_updates_path_names_title_artist_and_usn_once_per_track() {
         &[("Track", "Insomniak, Drymk - 1312 (Drymk Remix).wav")],
     );
     // the renamed file must exist on disk before relinking (pipeline order)
-    let old = td.path().join("Track/Insomniak, Drymk - 1312 (Drymk Remix).wav");
-    let new = td.path().join("Track/Drymk, Insomniak - 1312 (Drymk Remix).wav");
+    let old = td
+        .path()
+        .join("Track/Insomniak, Drymk - 1312 (Drymk Remix).wav");
+    let new = td
+        .path()
+        .join("Track/Drymk, Insomniak - 1312 (Drymk Remix).wav");
     std::fs::rename(&old, &new).unwrap();
 
     let map = mapping(&[(
@@ -107,17 +121,28 @@ fn apply_updates_path_names_title_artist_and_usn_once_per_track() {
     let changed = apply_relink(
         &mut db,
         &plan,
-        ApplyOptions { allow_while_running: true, ..Default::default() },
+        ApplyOptions {
+            allow_while_running: true,
+            ..Default::default()
+        },
     )
     .unwrap();
     assert_eq!(changed, 1);
 
     let c = db.get_content_by_id(&plan[0].content_id).unwrap().unwrap();
-    assert!(c.folder_path.as_deref().unwrap().ends_with(
-        "/Track/Drymk, Insomniak - 1312 (Drymk Remix).wav"
-    ));
-    assert_eq!(c.file_name_l.as_deref(), Some("Drymk, Insomniak - 1312 (Drymk Remix).wav"));
-    assert_eq!(c.file_name_s.as_deref(), Some("Drymk, Insomniak - 1312 (Drymk Remix).wav"));
+    assert!(c
+        .folder_path
+        .as_deref()
+        .unwrap()
+        .ends_with("/Track/Drymk, Insomniak - 1312 (Drymk Remix).wav"));
+    assert_eq!(
+        c.file_name_l.as_deref(),
+        Some("Drymk, Insomniak - 1312 (Drymk Remix).wav")
+    );
+    assert_eq!(
+        c.file_name_s.as_deref(),
+        Some("Drymk, Insomniak - 1312 (Drymk Remix).wav")
+    );
     assert_eq!(c.title.as_deref(), Some("1312 (Drymk Remix)"));
 
     // artist refresh linked a djmdArtist row
@@ -127,14 +152,16 @@ fn apply_updates_path_names_title_artist_and_usn_once_per_track() {
 
     // full-row update bumped the local USN; artist maintenance adds its own
     let usn_after = db.get_local_usn().unwrap();
-    assert!(usn_after > usn_before, "usn advanced ({usn_before} -> {usn_after})");
+    assert!(
+        usn_after > usn_before,
+        "usn advanced ({usn_before} -> {usn_after})"
+    );
 }
 
 #[test]
 fn apply_refuses_missing_target_file() {
     let td = tempfile::tempdir().unwrap();
-    let (_p, mut db) =
-        make_db(td.path(), &[("Track", "A - B.wav")]);
+    let (_p, mut db) = make_db(td.path(), &[("Track", "A - B.wav")]);
     // do NOT rename on disk: relink must fail (rbox validates the target path)
     let map = mapping(&[("A - B.wav", "B - A.wav")]);
     let plan = build_relink_plan(&mut db, &map, None).unwrap();
@@ -142,9 +169,15 @@ fn apply_refuses_missing_target_file() {
     let err = apply_relink(
         &mut db,
         &plan,
-        ApplyOptions { allow_while_running: true, ..Default::default() },
+        ApplyOptions {
+            allow_while_running: true,
+            ..Default::default()
+        },
     );
-    assert!(err.is_err(), "applying without the renamed file on disk must fail");
+    assert!(
+        err.is_err(),
+        "applying without the renamed file on disk must fail"
+    );
 }
 
 #[test]
