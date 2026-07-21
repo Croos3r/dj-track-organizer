@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 [package]
 name = "track-organizer"
-version = "0.1.0"
+version = "0.0.1"
 description = "One-click DJ library organizer: normalize, tag, Rekordbox sync, dedup"
 edition.workspace = true
 license.workspace = true

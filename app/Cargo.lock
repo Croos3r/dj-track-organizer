@@ -2667,7 +2667,7 @@ dependencies = [
 
 [[package]]
 name = "organizer-core"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "blake3",
  "chrono",
@@ -4431,7 +4431,7 @@ dependencies = [
 
 [[package]]
 name = "track-organizer"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "chrono",
  "organizer-core",
