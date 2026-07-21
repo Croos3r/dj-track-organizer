@@ -507,7 +507,7 @@ async fn tag_folder(
         let done = AtomicUsize::new(0);
         let results = tagging::tag_files(&files, settings.max_threads, || {
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-            if n % 16 == 0 || n == total {
+            if n.is_multiple_of(16) || n == total {
                 let _ = app.emit(
                     "tag-progress",
                     TagProgress {

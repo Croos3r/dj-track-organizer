@@ -23,6 +23,12 @@ use rbox::masterdb::{establish_connection, MasterDb};
 const DATE_OLD: &str = "2026-01-01 00:00:00.000 +00:00";
 const DATE_NEW: &str = "2026-02-01 00:00:00.000 +00:00";
 
+type DbState = (
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+    BTreeMap<String, (String, String)>,
+);
+
 fn exec_all(conn: &mut diesel::SqliteConnection, sql: &str) {
     for stmt in sql.split(';') {
         let s: String = stmt
@@ -98,13 +104,7 @@ fn seed_db(db_path: &Path) {
 }
 
 /// Everything semantically relevant, ordered: contents, cue links, playlist links.
-fn dump_state(
-    db_path: &Path,
-) -> (
-    BTreeMap<String, String>,
-    BTreeMap<String, String>,
-    BTreeMap<String, (String, String)>,
-) {
+fn dump_state(db_path: &Path) -> DbState {
     #[derive(QueryableByName)]
     struct Row3 {
         #[diesel(sql_type = diesel::sql_types::Text)]

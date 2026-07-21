@@ -348,16 +348,12 @@ fn main() {
                 .map(|grp| grp.iter().map(|f| f.path.clone()).collect())
                 .collect();
         }
-        if baseline_groups.is_none() {
+        if let Some(baseline) = &baseline_groups {
+            assert_eq!(&groups, baseline, "{label} changed the groups!");
+        } else {
             baseline_groups = Some(groups.clone());
             base_time = best;
             base_bytes = bytes;
-        } else {
-            assert_eq!(
-                &groups,
-                baseline_groups.as_ref().unwrap(),
-                "{label} changed the groups!"
-            );
         }
         println!(
             "    {:<34}  {:>7.3}s  {:>8.2}x  {:>8.0}MB  {:>7.1}x",
